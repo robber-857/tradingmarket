@@ -152,7 +152,7 @@ def reserve(user_id, key, fingerprint, bucket):
         if old:
             if old['fingerprint'] != fingerprint:
                 raise HTTPException(409, '同一请求编号不能用于不同分析。')
-            if old['state'] == 'complete':
+            if old['state'] in ('complete', 'fallback'):
                 return json.loads(old['response'])
             if old['state'] == 'pending':
                 raise HTTPException(409, '该分析正在处理或等待恢复，请勿重复提交。')
@@ -172,7 +172,7 @@ def reserve(user_id, key, fingerprint, bucket):
 def finish(user_id, key, result=None):
     with database() as db:
         db.execute('UPDATE usage SET state=?,response=? WHERE user_id=? AND key=? AND state=?',
-                   ('complete' if result is not None else 'failed', json.dumps(result, ensure_ascii=False) if result is not None else None,
+                   (('fallback' if result.get('chargeable') is False else 'complete') if result is not None else 'failed', json.dumps(result, ensure_ascii=False) if result is not None else None,
                     user_id, key, 'pending'))
         if result and result.get('conversationId'):
             db.execute('INSERT OR IGNORE INTO conversations VALUES (?,?)', (result['conversationId'], user_id))

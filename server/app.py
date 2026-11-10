@@ -39,6 +39,8 @@ async def lifespan(app):
 
 
 app=FastAPI(title='Clarora research engine', version='0.3.0', lifespan=lifespan)
+from . import auth
+app.include_router(auth.router)
 app.include_router(member_api.router)
 app.include_router(scheduled.router)
 app.include_router(academy.router)

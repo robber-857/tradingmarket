@@ -479,3 +479,15 @@
     transition: none;
   }
 }
+
+/* Long-form research keeps a comfortable reading measure on every screen. */
+.ai-research .ai-insights { display:block; max-width:860px; }
+.ai-research .ai-claim { border-bottom:1px solid var(--border); padding:24px 0; }
+.ai-research .ai-claim h3 { font-size:18px; margin:8px 0 12px; }
+.ai-research .ai-claim p { font-size:15px; line-height:1.95; max-width:860px; }
+.ai-research .ai-conclusion p { font-size:18px; font-weight:500; }
+.ai-research .ai-citations { opacity:.8; }
+.ai-evidence { margin-top:12px; }
+.ai-evidence summary { cursor:pointer; color:var(--muted); font-size:12px; width:fit-content; }
+.ai-evidence[open] summary { margin-bottom:10px; }
+@media(max-width:600px){ .ai-research .ai-claim p{font-size:15px;line-height:1.85;} .ai-research .ai-conclusion p{font-size:17px;} .ai-research .ai-citations button{white-space:normal;text-align:left;} }

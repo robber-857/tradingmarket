@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Auth from "./Auth";
 import ResearchWorkspace from "./ResearchWorkspace";
 import MacroCalendar from "./MacroCalendar";
 import NewsWorkspace from "./NewsWorkspace";
@@ -990,6 +991,7 @@ export default function App() {
     membership: () => <Suspense fallback={<p role="status">正在打开会员中心…</p>}><Membership /></Suspense>,
     settings: renderSettings,
   };
+  if (page === 'login' || page === 'register') return <Auth key={page}/>;
   return (
     <div className="app-shell">
       {mobile && (

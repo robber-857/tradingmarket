@@ -5,6 +5,7 @@ from collections import deque
 from datetime import datetime, timezone
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -20,7 +21,7 @@ from . import market
 from .membership import DEPTH
 from .valuation import Assumptions, WaccInputs, BetaInputs, calculate_beta, calculate_wacc, valuation_bundle
 
-PROMPT_VERSION = 'evidence-brief-1.3.0'
+PROMPT_VERSION = 'investor-report-2.1.2'
 DEFAULT_MODEL = 'gpt-5.4-mini'
 PLACEHOLDER = re.compile(r'\{\{([A-Z][A-Z0-9_]*)\}\}')
 
@@ -76,6 +77,36 @@ class Brief(BaseModel):
     watch_next: str = Field(min_length=1, max_length=180)
     limitations: str = Field(min_length=1, max_length=200)
     followups: list[str] = Field(min_length=1, max_length=3)
+
+
+class ResearchClaim(Claim):
+    citations: list[str] = Field(min_length=1, max_length=32)
+    title: str = Field(min_length=1, max_length=32)
+    text: str = Field(min_length=40, max_length=1600)
+
+
+class ResearchBrief(Brief):
+    conclusion: ResearchClaim
+    insights: list[ResearchClaim] = Field(min_length=3, max_length=7)
+
+
+RESEARCH_STYLE = """
+面向希望轻松看懂公司与投资价值的普通读者，使用清楚、连贯的中文，不堆砌术语。
+先给经营与投资含义的综合判断，然后解释证据为什么重要；不要以折现率、终值权重开篇。
+每段 title 是具体中文小标题。text 用自然段，依次说明观察、原因边界、对投资者的意义。
+财报覆盖：增长和盈利能力、利润含金量与现金、投入与财务风险、值得期待的变化与需要警惕的信号。
+基本面覆盖：经营质量与增长持续性、现金创造和再投资、当前报价与条件估值的关系、悲观/基准/乐观情景、催化条件与下行风险、后续跟踪。
+给出有证据支持的偏积极、谨慎或中性研究判断，并解释判断改变的条件。可以讨论投资吸引力与风险收益条件，但不提供个人买卖指令。
+若 valuationUnavailable=true，不得提供 DCF 目标价或假设参数结论；仍解释经营、现金、可用报价及倍数。
+基本面有可用报价和估值时必须比较 P_QUOTE/A_COMPARISON_PRICE 与 V_BASE/V_CASE，解释估值空间是否依赖乐观经营兑现；缺数据时明确不能判断价格吸引力，仍分析经营。
+首次出现 WACC、ROIC、FCFF、终值等术语时用白话解释。参数和假设用于支撑解释，不能替代投资分析。
+不要为了篇幅重复数字或免责声明；把主要证据缺口集中在 limitations。所有数字仍须使用引用占位符，情景不是官方预测。
+结论只突出最重要的投资判断与反面证据，避免罗列财务报表。每个主题通常选择两至三个关键数值，其余篇幅解释对生意、股东回报和判断条件的影响。不要将缺失指标写成数值占位符；unavailableIndicators 中的项目只能用中文说明缺失，不能引用其 ID。
+正文不得提及 citations、registry、JSON、字段或内部校验机制，也不要写“人看得懂的意思”。直接面向读者解释。缺少债务期限、利息覆盖和可变现资产明细时，不得断言债务安全或不是高危杠杆；只能说明已知缓冲和仍需核对的风险。营收和利润率变化本身不能证明销量、提价或效率改善的具体原因。
+结论用两三句话讲清“生意怎么样、投资机会在哪里、最大的顾虑是什么”，尽量不出现数字，引用放 citations 即可。不要以“整体判断”“对投资者来说”“换句话说”反复起句。用公司当期最重要的矛盾组织内容，避免每段都按同一套句式复述。
+普通模式约三百至五百字。深度模式约六百至九百字，尽量不超过一千字；为了讲清关键问题可以稍长，不能为了凑字数重复。结论约六十至一百字，正文三至五个主题，必须讲清投资机会、风险、后续关注点。每个主题最多突出一两个关键数值，其他数字留在引用中。不要用长篇参数说明代替判断。负的安全边际表示价格相对条件估值偏高，不代表预计亏损比例。
+追问直接深入回答问题，不机械重复整份报告；深度追问仍提供充分解释。输出严格 JSON，不输出思维链。
+"""
 
 
 LABELS = {
@@ -255,7 +286,15 @@ watch_next、limitations、followups 用简短自然语言，不含具体数字�
 
 
 def validate_answer(raw, context):
-    brief = Brief.model_validate(raw)
+    if context.get('researchFormat'):
+        # A verified placeholder is itself an explicit evidence reference. Preserve
+        # it in the visible citation list even if the model omitted the duplicate ID.
+        raw = json.loads(json.dumps(raw))
+        for claim in [raw.get('conclusion', {}), *raw.get('insights', [])]:
+            for ref in PLACEHOLDER.findall(claim.get('text', '')):
+                if ref in context['registry'] and context['registry'][ref]['value'] is not None and ref not in claim.get('citations', []):
+                    claim.setdefault('citations', []).append(ref)
+    brief = (ResearchBrief if context.get('researchFormat') else Brief).model_validate(raw)
     registry = context['registry']
     data = brief.model_dump()
     for claim in [data['conclusion'], *data['insights']]:
@@ -286,6 +325,9 @@ def validate_answer(raw, context):
         if claim['kind']=='fact' and re.search(r'(表明|说明|支撑|意味着|侵蚀|反映)',claim['text']):
             claim['kind']='inference'
         claim['text'] = PLACEHOLDER.sub(lambda m:registry[m[1]]['display'],claim['text'])
+        # Model schema vocabulary is implementation detail, not reader-facing prose.
+        claim['text'] = re.sub(r'(?<![a-z])citations(?![a-z])', '证据引用', claim['text'], flags=re.I)
+        claim['text'] = re.sub(r'(?<![a-z])registry(?![a-z])', '证据清单', claim['text'], flags=re.I)
         claim['text'] = re.sub(r'倍\s*倍','倍',claim['text'])
         claim['text'] = re.sub(r'\+\s*\+','+',claim['text'])
     for text in [data['watch_next'],data['limitations'],*data['followups']]:
@@ -296,27 +338,40 @@ def validate_answer(raw, context):
     return data
 
 
-async def call_openai(context, history, question, *, instructions=None, validator=None, reasoning_effort='medium'):
+async def call_openai(context, history, question, *, instructions=None, validator=None, reasoning_effort='medium', _repair=None, _deadline=None):
     deep = DEPTH.get() == 'deep'
     key,model = settings()
     if not key:
         raise AIError(503,'尚未配置 OPENAI_API_KEY，请在项目根目录 .env 填写后点击“检查配置”。')
     # Send compact facts, not raw filings, account details, or SEC contact identity.
-    compact = {**context,'registry':{k:{a:b for a,b in v.items() if a!='evidence'} for k,v in context['registry'].items()}}
-    schema=Brief.model_json_schema()
+    research = context.get('researchFormat', False)
+    deadline = _deadline or (time.monotonic() + (230 if research and deep else 90))
+    usable_registry = {k:v for k,v in context['registry'].items() if not research or v['value'] is not None}
+    compact = {**context,'registry':{k:{a:b for a,b in v.items() if a!='evidence'} for k,v in usable_registry.items()}}
+    if research:
+        compact['unavailableIndicators'] = [v['label'] for v in context['registry'].values() if v['value'] is None]
+    schema=(ResearchBrief if research else Brief).model_json_schema()
+    if research:
+        schema['properties']['insights'].update(minItems=3, maxItems=5)
     if context.get('mode') == 'macro' and 'E_BANK_SUMMARY' in context['registry']:
         schema['properties']['insights'].update(minItems=3, maxItems=3)
-    schema['$defs']['Claim']['properties']['citations']['items']={'type':'string','enum':list(context['registry'])}
-    payload = {'model':model,'store':False,'instructions':instructions or INSTRUCTIONS,
+    schema['$defs']['ResearchClaim' if research else 'Claim']['properties']['citations']['items']={'type':'string','enum':list(usable_registry)}
+    payload = {'model':model,'store':False,'instructions':instructions or (INSTRUCTIONS[:INSTRUCTIONS.index('任务：')] + INSTRUCTIONS[INSTRUCTIONS.index('每个 conclusion/insight'):INSTRUCTIONS.index('全文尽量控制')] + RESEARCH_STYLE if research else INSTRUCTIONS),
         'input':[{'role':'user','content':json.dumps({'evidence':compact,'history':history,'question':question},ensure_ascii=False)}],
-        'reasoning':{'effort':'high' if deep else reasoning_effort}, 'max_output_tokens':10000 if deep else 6000,
+        'reasoning':{'effort':'high' if deep else reasoning_effort}, 'max_output_tokens':18000 if deep and research else 10000 if deep or research else 6000,
         'text':{'format':{'type':'json_schema','name':'research_brief','strict':True,'schema':schema}}}
     if deep:
-        payload['instructions'] += '\n深度分析模式：在既定结构和证据范围内，优先检查相反解释、关键假设敏感性、证据缺口及能够证伪结论的观察条件。不得编造新数据或假称开展外部检索。保持原有引用校验与篇幅要求。'
+        payload['instructions'] += '\n深度分析模式：在既定结构和证据范围内，优先检查相反解释、关键假设敏感性、证据缺口及能够证伪结论的观察条件。不得编造新数据或假称开展外部检索。保持原有引用校验；研究报告按深度模式篇幅展开。'
+    if _repair is not None:
+        payload['input'].append({'role':'user','content':json.dumps({'validation_repair':_repair},ensure_ascii=False)})
+        payload['instructions'] += '\n上一份草稿未通过校验。根据 validation_repair 修正整份报告，保留分析深度。只使用可用的引用与占位符，删除无依据的数值或归因，不要向读者解释修正过程。输出完整 JSON。'
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(90,connect=10)) as client:
-            response = await client.post('https://api.openai.com/v1/responses',
-                headers={'Authorization':f'Bearer {key}','Content-Type':'application/json'},json=payload)
+        remaining=max(1,deadline-time.monotonic())
+        async with httpx.AsyncClient(timeout=httpx.Timeout(remaining,connect=10)) as client:
+            response = await asyncio.wait_for(client.post('https://api.openai.com/v1/responses',
+                headers={'Authorization':f'Bearer {key}','Content-Type':'application/json'},json=payload),timeout=remaining)
+    except asyncio.TimeoutError as exc:
+        raise AIError(504,'AI 请求超时，请稍后手动重试；不会自动重复调用。') from exc
     except httpx.TimeoutException as exc:
         raise AIError(504,'AI 请求超时，请稍后手动重试；不会自动重复调用。') from exc
     except httpx.HTTPError as exc:
@@ -327,6 +382,7 @@ async def call_openai(context, history, question, *, instructions=None, validato
         raise AIError(429,'OpenAI 额度或请求速率受限，请检查账户额度后重试。')
     if response.status_code>=400:
         raise AIError(502,'OpenAI 未接受请求，请检查 OPENAI_MODEL 是否支持 Responses 与结构化输出。')
+    raw = None
     try:
         body=response.json()
         if body.get('status')!='completed':
@@ -335,13 +391,80 @@ async def call_openai(context, history, question, *, instructions=None, validato
         if any(p.get('type')=='refusal' for p in parts):
             raise AIError(422,'AI 未能回答此问题，请改为询问财报指标或当前估值假设。')
         raw=json.loads(''.join(p.get('text','') for p in parts if p.get('type')=='output_text'))
+        if research and _repair is None:
+            check_readability(raw)
         answer=(validator or validate_answer)(raw,context)
     except (ValueError,KeyError,TypeError,ValidationError) as exc:
+        reason = str(exc) if type(exc) is ValueError else type(exc).__name__
+        logging.getLogger(__name__).warning('AI validation rejected: %s; repair=%s', reason, _repair is not None)
+        if research and _repair is None and isinstance(raw,dict) and deadline-time.monotonic()>30:
+            try:
+                return await call_openai(context,history,question,instructions=instructions,validator=validator,
+                                         reasoning_effort=reasoning_effort,_deadline=deadline,
+                                         _repair={'reason':reason,'draft':raw})
+            except AIError:
+                return readable_recovery(context,raw)
+        if research:
+            return readable_recovery(context,raw)
         error = AIError(502,'回答未通过数字或引用校验，本次不展示。请重试或缩小问题范围。')
-        error.validation_reason = str(exc) if type(exc) is ValueError else type(exc).__name__
+        error.validation_reason = reason
         raise error from exc
     return {'answer':answer,'model':model,'responseId':body.get('id'),
         'usage':{k:body.get('usage',{}).get(k) for k in ('input_tokens','output_tokens','total_tokens')}}
+
+
+def check_readability(raw):
+    """An editorial retry improves readability without ever hiding all output."""
+    if not isinstance(raw,dict):return
+    conclusion=raw.get('conclusion',{})
+    if isinstance(conclusion,dict) and PLACEHOLDER.findall(conclusion.get('text','')):
+        raise ValueError('结论请不用具体数字，直接解释机会和顾虑；数字依据留在 citations。')
+    for claim in raw.get('insights',[]):
+        if isinstance(claim,dict) and len(PLACEHOLDER.findall(claim.get('text','')))>2:
+            raise ValueError('正文数字过密：每个主题最多保留两个数值占位符，其余数字仅留 citations；用普通中文说明机会、风险和观察条件，不逐项列报表或估值参数。')
+
+
+def readable_recovery(context, raw=None):
+    """Never publish unchecked prose. Retain independently valid paragraphs or
+    provide an explicitly labelled, uncharged evidence-based reading guide."""
+    registry=context['registry']
+    available=[k for k,v in registry.items() if v.get('value') is not None]
+    anchor=(available or list(registry))[:1]
+    def claim(title,text,refs=None):
+        return {'title':title,'text':text,'kind':'inference','citations':refs or anchor}
+    def evidence(ids):
+        valid=[i for i in ids if i in available]
+        return valid, '；'.join(registry[i]['label']+'为{{'+i+'}}' for i in valid)
+    refs,growth=evidence(['M_REVENUE_YOY','M_GROSS_MARGIN_YOY'])
+    opportunity=claim('机会要看增长能否留下利润',(growth+'。' if growth else '当前增长对比数据不完整。')+'如果收入扩大时还能守住赚钱能力，增长才更可能增加企业价值；若只是收入变多、利润跟不上，机会就要打折。接下来把收入和利润的变化放在一起看，不凭单项指标决定是否值得投资。',refs)
+    refs,cash=evidence(['T_CASH_CONVERSION','M_CASH_CONVERSION'])
+    risk=claim('先检查赚到的钱是否收回来',(cash+'。' if cash else '当前现金转换数据不足。')+'现金长期跟不上利润，是需要进一步核对的风险信号；单季错位还不能证明业务出了问题。还要结合债务到期安排和资金需求，不能只凭利润增长就认定财务安全。',refs)
+    refs,price=evidence(['P_QUOTE','V_BASE'])
+    if context['mode']=='fundamentals' and len(refs)==2:
+        price_claim=claim('好公司也需要合适的价格',price+'。这是当前输入假设下的比较，不是公司承诺的目标价。报价高于条件估值时，需要更强的增长或盈利兑现才能支撑；低于条件估值也不自动意味着便宜，要先检查假设是否过于乐观。',refs)
+        price_claim['kind']='hypothesis'
+    else:
+        price_claim=claim('经营机会和买入价格分开判断','当前证据不足以直接确认价格是否有吸引力。可以先观察增长是否持续、利润是否变成现金，再结合报价与合理的经营假设判断价格。不要把业绩改善直接理解成股价一定上涨，也不要在缺少价格依据时给出买卖结论。')
+    base={'conclusion':claim('先看已经能够确认的部分','完整分析暂时没有生成，先根据当前证据梳理机会、风险和观察方向。能否形成投资机会，取决于增长能否留下利润、利润能否变成现金，以及价格是否已反映这些好消息；目前不强行给出乐观或悲观结论。'),
+          'insights':[opportunity,risk,price_claim],
+          'watch_next':'后续优先看收入和利润是否同步、现金是否跟上，以及当前价格需要怎样的经营表现才能支撑。',
+          'limitations':'这是基于当前证据的基础解读，不是完整的个性化分析；缺失数据不补猜，估值假设也不是官方预测。',
+          'followups':['增长能否转化成现金？']}
+    checked=[]
+    if isinstance(raw,dict):
+        for candidate in [raw.get('conclusion'),*(raw.get('insights') if isinstance(raw.get('insights'),list) else [])]:
+            if not isinstance(candidate,dict):continue
+            try:
+                envelope={**base,'conclusion':candidate,'insights':[candidate]*3}
+                validate_answer(envelope,context)
+                checked.append(candidate)
+            except (ValueError,TypeError,KeyError):pass
+    if len(checked)>=4:
+        base.update(conclusion=checked[0],insights=checked[1:6])
+        base['limitations']='已保留通过证据检查的段落，暂未确认的内容未展示；这不是完整分析，本次不扣 AI 额度。'
+    return {'answer':validate_answer(base,context),'model':None,'responseId':None,'usage':{},
+            'outputMode':'partial' if len(checked)>=4 else 'basic','chargeable':False,
+            'notice':'已展示可确认的分析内容，本次不扣 AI 额度。' if len(checked)>=4 else '完整 AI 分析暂未完成，先为你展示基于当前数据的基础解读。本次不扣 AI 额度。'}
 
 
 # Local single-user service. No API key ever enters the session or browser payload.
@@ -352,8 +475,7 @@ _active = set()
 
 async def explain(report, quarter, request):
     context,fingerprint=build_context(report,quarter,request)
-    if not settings()[0]:
-        raise AIError(503,'尚未配置 OPENAI_API_KEY，请在项目根目录 .env 填写后点击“检查配置”。')
+    context['researchFormat'] = True
     now=time.monotonic()
     for sid in list(SESSIONS):
         if now-SESSIONS[sid]['updated']>3600 and sid not in _active: del SESSIONS[sid]
@@ -369,10 +491,13 @@ async def explain(report, quarter, request):
     if len(_calls)>=10: raise AIError(429,'本机 AI 请求过于频繁，请稍后再试。')
     _calls.append(now)
     _active.add(sid)
-    question=request.question.strip() or ('请简洁解读这份财报最重要的变化、代价和待验证问题。' if request.mode=='financials' else '当前假设下，估值最依赖什么？哪些经营证据支持或挑战这些假设？')
+    question=request.question.strip() or ('请完整分析这份财报：公司表现如何、盈利质量怎样、对投资者意味着什么、有哪些机会和风险。' if request.mode=='financials' else '请分析公司基本面与投资吸引力：经营质量、增长前景、价格与价值、情景风险以及接下来应该关注什么。')
     history=session['history'][:] if session else []
     try:
-        result=await call_openai(context,history,question)
+        try:
+            result=await call_openai(context,history,question)
+        except AIError:
+            result=readable_recovery(context)
         history.append({'question':question,'answer':result['answer']})
         if len(SESSIONS)>=100:
             removable=[k for k in SESSIONS if k not in _active]
@@ -381,7 +506,7 @@ async def explain(report, quarter, request):
         ids=set(i for c in [result['answer']['conclusion'],*result['answer']['insights']] for i in c['citations'])
         return {**result,'conversationId':sid,'turn':len(history),'question':question,
             'snapshotId':report['snapshotId'],'reportEnd':quarter['end'],'symbol':report['symbol'],
-            'mode':request.mode,'contextHash':fingerprint,'citations':{i:context['registry'][i] for i in sorted(ids)},
+            'analysisDepth':request.analysis_depth,'mode':request.mode,'contextHash':fingerprint,'citations':{i:context['registry'][i] for i in sorted(ids)},
             'assumptions':request.assumptions.model_dump() if request.assumptions else None,
             'capitalInputs':request.capital_inputs.model_dump() if request.capital_inputs else None,
             'betaSample':request.beta_sample.model_dump(mode='json') if request.beta_sample else None,

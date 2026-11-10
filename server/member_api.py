@@ -8,7 +8,7 @@ import smtplib
 import ssl
 import time
 from typing import Literal
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,12 +22,16 @@ router = APIRouter(prefix='/api')
 
 def email_login_enabled():
     return m.local_mode() or (m.config('EMAIL_LOGIN_ENABLED', '1') != '0'
-                              and bool(m.config('SMTP_HOST') and m.config('SMTP_FROM')))
+                              and bool(m.config('SMTP_HOST') and m.config('SMTP_FROM'))
+                              and (not m.config('SMTP_USER') or bool(m.config('SMTP_PASSWORD'))))
 
 
 class EmailRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     email: str = Field(min_length=3, max_length=254)
+    phone: str = Field(default="", max_length=30)
+    intent: Literal["login", "register"] = "login"
+    next: str = Field(default="overview", max_length=200)
 
 
 class TokenRequest(BaseModel):
@@ -93,8 +97,14 @@ async def request_link(body: EmailRequest, request: Request):
     m.throttle('ip:'+(request.client.host if request.client else 'unknown'), 15)
     if not m.local_mode() and not m.config('SMTP_HOST'):
         raise HTTPException(503, '登录邮件服务尚未开放。')
+    phone = body.phone.strip()
+    if phone and not re.fullmatch(r'\+?[0-9 ()-]{6,30}', phone):
+        raise HTTPException(422, '请输入有效手机号，或留空。')
     token = m.issue_login(email)
-    link = origin()+'/#membership?token='+token
+    from .auth import safe_next
+    with m.database() as db:
+        db.execute('INSERT INTO auth_pending VALUES (?,?,?)', (m.digest(token), json.dumps({'phone': phone if body.intent == 'register' else '', 'next': safe_next(body.next)}), time.time()+900))
+    link = origin()+'/#login?'+urlencode({'token':token, 'next':safe_next(body.next)})
     if m.local_mode():
         return {'message': '本地开发模式：使用以下一次性链接登录。公网模式不会返回登录链接。', 'localLoginUrl': link}
     await asyncio.to_thread(send_login, email, link)
@@ -105,9 +115,18 @@ async def request_link(body: EmailRequest, request: Request):
 def verify(body: TokenRequest, request: Request, response: Response):
     m.throttle('verify:'+(request.client.host if request.client else 'unknown'), 20)
     session, user = m.redeem_login(body.token)
+    destination = 'overview'
+    with m.database() as db:
+        pending = db.execute('SELECT * FROM auth_pending WHERE hash=? AND expires>?', (m.digest(body.token), time.time())).fetchone()
+        if pending:
+            metadata = json.loads(pending['payload'])
+            destination = metadata['next']
+            if metadata['phone']:
+                db.execute('INSERT INTO user_profiles VALUES (?,?) ON CONFLICT(user_id) DO NOTHING', (user['id'], metadata['phone']))
+            db.execute('DELETE FROM auth_pending WHERE hash=?', (m.digest(body.token),))
     response.set_cookie(m.COOKIE, session, httponly=True, secure=not m.local_mode(), samesite='lax', max_age=30*86400, path='/')
     response.headers['Cache-Control'] = 'no-store'
-    return m.account(user)
+    return {**m.account(user), "next": destination}
 
 
 @router.get('/account')

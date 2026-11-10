@@ -34,3 +34,7 @@ CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL
           user_id TEXT NOT NULL REFERENCES users(id), action TEXT NOT NULL, detail TEXT NOT NULL, created REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS admin_requests(actor_id TEXT NOT NULL, key TEXT NOT NULL,
           fingerprint TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor_id,key));
+
+CREATE TABLE IF NOT EXISTS auth_pending(hash TEXT PRIMARY KEY, payload TEXT NOT NULL, expires REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS user_profiles(user_id TEXT PRIMARY KEY REFERENCES users(id), phone TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS oauth_identities(subject TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id));

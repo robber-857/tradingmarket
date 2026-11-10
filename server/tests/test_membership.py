@@ -22,6 +22,37 @@ def grant(user, plan='advanced', days=30):
                    ('paid-'+user,user,plan,time.time()-1,time.time()+days*86400,json.dumps(m.PLANS[plan]['limits'])))
 
 
+def test_fallback_is_replayable_without_spending_quota():
+    with TestClient(app) as client:
+        uid=login(client)
+        before=client.get('/api/account').json()['usage']
+        assert m.reserve(uid,'basic-result','fingerprint','deep') is None
+        result={'answer':{'text':'基础解读'},'chargeable':False,'conversationId':'d'*32}
+        m.finish(uid,'basic-result',result)
+        assert client.get('/api/account').json()['usage']==before
+        assert m.reserve(uid,'basic-result','fingerprint','deep')==result
+        m.check_conversation(uid,'d'*32)
+        assert m.reserve(uid,'next-real-request','different','deep') is None
+
+
+def test_http_fallback_replay_keeps_allowance(monkeypatch):
+    calls=[]
+    async def fallback(body):
+        calls.append(True)
+        return {'answer':{'text':'已确认的内容'},'outputMode':'partial','chargeable':False,'conversationId':'e'*32}
+    monkeypatch.setattr(news_ai,'explain',fallback)
+    with TestClient(app) as client:
+        login(client)
+        before=client.get('/api/account').json()['usage']
+        body={'snapshot_id':'a'*24,'analysis_depth':'deep'}
+        headers={'Idempotency-Key':'fallback-http-test'}
+        first=client.post('/api/news/explain',json=body,headers=headers)
+        second=client.post('/api/news/explain',json=body,headers=headers)
+        assert first.status_code==second.status_code==200
+        assert second.headers['x-clarora-replayed']=='true'
+        assert len(calls)==1 and client.get('/api/account').json()['usage']==before
+
+
 def test_magic_link_one_use_and_cookie_logout():
     with TestClient(app) as client:
         token=m.issue_login('person@example.com')

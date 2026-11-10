@@ -2,18 +2,31 @@ import {useEffect, useRef, useState} from 'react';
 import './membership.css';
 import SavedResearch from './SavedResearch';
 import {memberRequest} from './member-api';
+import {subscribeAuthChange, getAccountSnapshot} from './auth-state';
 import BillingPanel from './BillingPanel';
 import {ArrowRight, Check, Sparkles, ShieldCheck, BookOpen, Clock3, UserRound, LogOut, CreditCard} from 'lucide-react';
 import './membership-design.css';
 
 const money=(value,currency)=>new Intl.NumberFormat('zh-CN',{style:'currency',currency:currency.toUpperCase(),maximumFractionDigits:0}).format(value/100);
 export default function Membership(){
-  const [catalog,setCatalog]=useState(null),[account,setAccount]=useState(null),[currency,setCurrency]=useState('usd');
+  const [catalog,setCatalog]=useState(null),[account,setAccount]=useState(getAccountSnapshot),[currency,setCurrency]=useState('usd');
   const [email,setEmail]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState(''),[link,setLink]=useState(''),[busy,setBusy]=useState(false);
   const loginPromise=useRef(null);
   const [selection,setSelection]=useState(null);
   const [tab,setTab]=useState(()=>new URLSearchParams(location.search).has('billing_order')?'billing':'plans');
   const refresh=()=>memberRequest('/api/account').then(setAccount);
+  useEffect(()=>{
+    let active=true, revision=0;
+    const reload=async event=>{
+      const current=++revision;
+      if(event?.account){setAccount(event.account);return;}
+      try{const data=await memberRequest('/api/account');if(active&&current===revision)setAccount(data);}
+      catch(e){if(active&&current===revision)setError(e.message);}
+    };
+    const unsubscribe=subscribeAuthChange(reload);
+    if(!new URLSearchParams(location.hash.split('?')[1]).has('token'))reload();
+    return()=>{active=false;unsubscribe();};
+  },[]);
   useEffect(()=>{
     let alive=true;
     memberRequest('/api/membership/plans').then(x=>alive&&setCatalog(x)).catch(e=>alive&&setError(e.message));
@@ -24,11 +37,11 @@ export default function Membership(){
     }
     if(loginPromise.current){
       loginPromise.current.then(x=>{if(alive){setAccount(x);setMessage('已登录，会员额度与研究记录属于此账户。');}}).catch(e=>alive&&setError(e.message));
-    }else memberRequest('/api/account').then(x=>alive&&setAccount(x)).catch(e=>alive&&setError(e.message));
+    }
     return()=>{alive=false;};
   },[]);
   async function login(e){e.preventDefault();setBusy(true);setError('');setLink('');try{const d=await memberRequest('/api/auth/request-link',{method:'POST',body:JSON.stringify({email})});setMessage(d.message);setLink(d.localLoginUrl||'');}catch(e){setError(e.message);}finally{setBusy(false);}}
-  async function logout(){setBusy(true);try{await memberRequest('/api/auth/logout',{method:'POST'});await refresh();setLink('');setMessage('已退出登录。');}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function logout(){setBusy(true);try{await memberRequest('/api/auth/logout',{method:'POST'});setLink('');setMessage('已退出登录。');}catch(e){setError(e.message);}finally{setBusy(false);}}
   function switchTab(next){setTab(next);requestAnimationFrame(()=>document.querySelector('.member-tabs')?.scrollIntoView({behavior:'smooth',block:'start'}));}
   function choose(plan,period='month'){setSelection({plan,period});switchTab('billing');}
   const plans=catalog?.plans.filter(p=>p.id!=='free')||[];
@@ -36,20 +49,20 @@ export default function Membership(){
   const loginDisabled=catalog?.emailLoginEnabled===false;
   const descriptions={research:'适合持续跟踪市场、建立研究习惯。',advanced:'把市场研究与系统学习放在一起。',expert:'为多标的跟踪和高频研究留出余量。'};
   const icons={research:BookOpen,advanced:Sparkles,expert:ShieldCheck};
-  const focusLogin=()=>{document.getElementById('member-email')?.focus();document.getElementById('member-account')?.scrollIntoView({behavior:'smooth',block:'center'});};
+  const focusLogin=()=>{location.hash='login?next=membership';};
   return <div className="membership-page member-center">
     {error&&<p className="home-error" role="alert">{error}</p>}{message&&<p className="member-notice" role="status">{message}</p>}
     <section className="member-account-strip" id="member-account" aria-label="我的账户">
       <span className="member-account-icon"><UserRound size={21}/></span>
-      {account?.user?<>
+      {account===null?<div className="member-account-identity" role="status"><strong>正在确认登录状态…</strong><span>请稍候</span></div>:account.user?<>
         <div className="member-account-identity"><strong>{account.planName}</strong><span>{account.user.email}</span><small>{account.expiresAt?'有效至 '+new Date(account.expiresAt*1000).toLocaleDateString('zh-CN'):'免费额度按 UTC 自然月重置'}</small></div>
         <div className="member-account-meters">{Object.entries(account.usage).filter(([k])=>k!=='sentiment').map(([key,v])=><div key={key}><span>{key==='ai'?'普通 AI':'深度分析'}<b>{v.remaining}<small> / {v.limit}</small></b></span><progress max={Math.max(1,v.limit)} value={v.remaining} aria-label={`${key==='ai'?'普通 AI':'深度分析'}剩余额度`}/></div>)}</div>
         <div className="member-account-actions">{account.isAdmin&&<a className="button" href="#admin">管理后台</a>}<button className="icon-button" aria-label="退出登录" title="退出登录" disabled={busy} onClick={logout}><LogOut size={17}/></button></div>
       </>:<>
-        <div className="member-account-identity"><strong>{loginDisabled?'内测预览':'登录，开始你的研究'}</strong><span>{loginDisabled?'邮箱登录暂未开放':'免费体验普通 AI 与深度分析'}</span></div>
-        <form className="member-inline-login" onSubmit={login}><label className="member-sr-only" htmlFor="member-email">邮箱登录／注册</label><input id="member-email" type="email" disabled={loginDisabled} required value={email} placeholder="输入你的邮箱" onChange={e=>setEmail(e.target.value)}/><button className="button primary" disabled={busy||loginDisabled}>{loginDisabled?'登录暂未开放':busy?'发送中…':'获取登录链接'}<ArrowRight size={15}/></button></form>
+        <div className="member-account-identity"><strong>登录，开始你的研究</strong><span>管理 AI 额度与已保存的研究</span></div>
+        <div className="member-inline-login"><a className="button primary" href="#login?next=membership">登录账户<ArrowRight size={15}/></a><a className="button" href="#register?next=membership">免费注册</a></div>
       </>}
-      {!account?.user&&<div className="member-login-note"><small>{loginDisabled?'当前可浏览公开研究内容；账号登录开放后，可使用 AI 分析与云端研究保存。':<>首次登录自动创建免费账户。{catalog?.localMode?'本机模式使用一次性登录链接。':'登录链接有效期十五分钟。'}</>}</small>{link&&<a className="button" href={link} onClick={()=>{window.location.href=link;window.location.reload();}}>使用本地一次性链接登录</a>}</div>}
+      {account&&!account.user&&<div className="member-login-note"><small>{loginDisabled?'当前可浏览公开研究内容；账号登录开放后，可使用 AI 分析与云端研究保存。':<>首次登录自动创建免费账户。{catalog?.localMode?'本机模式使用一次性登录链接。':'登录链接有效期十五分钟。'}</>}</small>{link&&<a className="button" href={link} onClick={()=>{window.location.href=link;window.location.reload();}}>使用本地一次性链接登录</a>}</div>}
     </section>
     <nav className="member-tabs" aria-label="会员中心导航">{[['plans','会员方案'],['billing','付款与账单'],['research','研究记录']].map(([id,label])=><button key={id} type="button" aria-current={tab===id?'page':undefined} onClick={()=>switchTab(id)}>{label}</button>)}<span><span className="member-test-dot"/>仅测试 · 正式收款未开放</span></nav>
     <div hidden={tab!=='plans'} className="member-tab-content">

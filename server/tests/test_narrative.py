@@ -170,16 +170,15 @@ def test_incomplete_refused_or_invalid_output_never_rendered(sample,monkeypatch,
 
 def test_missing_key_does_not_make_network_request(sample,monkeypatch):
     monkeypatch.setattr(n,'settings',lambda: ('','gpt-5-mini'))
-    with pytest.raises(n.AIError) as error:asyncio.run(n.explain(*sample))
-    assert error.value.status==503
-    assert not n.SESSIONS
+    result=asyncio.run(n.explain(*sample))
+    assert result['outputMode']=='basic' and result['chargeable'] is False
 
 
 def test_conversation_context_and_history_are_server_owned(sample,monkeypatch):
     seen=[]
     async def model(context,history,question):
         seen.append(copy.deepcopy(history))
-        return {'answer':n.validate_answer(valid_brief(),context),'model':'test','usage':{},'responseId':'test'}
+        return {'answer':n.validate_answer(research_brief(),context),'model':'test','usage':{},'responseId':'test'}
     monkeypatch.setattr(n,'call_openai',model)
     report,q,req=sample
     first=asyncio.run(n.explain(report,q,req))
@@ -196,8 +195,9 @@ def test_conversation_context_and_history_are_server_owned(sample,monkeypatch):
 def test_failed_answer_does_not_commit_conversation(sample,monkeypatch):
     async def fail(*args):raise n.AIError(502,'校验失败')
     monkeypatch.setattr(n,'call_openai',fail)
-    with pytest.raises(n.AIError):asyncio.run(n.explain(*sample))
-    assert not n.SESSIONS and not n._active
+    result=asyncio.run(n.explain(*sample))
+    assert result['outputMode']=='basic' and not n._active
+    assert n.SESSIONS[result['conversationId']]['history'][0]['answer']==result['answer']
 
 
 def test_unknown_conversation_cannot_attach_to_snapshot(sample):
@@ -257,3 +257,143 @@ def test_timeout_is_clear_and_does_not_leak_provider_request(sample,monkeypatch)
     context,_=n.build_context(*sample)
     with pytest.raises(n.AIError) as error:asyncio.run(n.call_openai(context,[],'问题'))
     assert error.value.status==504 and 'sensitive' not in error.value.message
+
+
+def research_brief():
+    body=valid_brief()
+    for claim in [body['conclusion'],*body['insights']]:
+        claim['title']='经营变化与投资含义'
+        claim['text']+='收入变化需要与利润和现金一起观察。对于投资者，这意味着应检查增长能否转化为可持续的现金，而非仅看规模扩大。'
+    body['insights']=body['insights']*3
+    return body
+
+
+def test_research_report_preserves_long_prose_and_citations(sample):
+    context,_=n.build_context(*sample)
+    context['researchFormat']=True
+    answer=n.validate_answer(research_brief(),context)
+    assert len(answer['insights'])==3
+    assert '20.0%' in answer['insights'][0]['text']
+    assert answer['conclusion']['title']
+
+
+def test_research_format_rejects_old_tiny_summary(sample):
+    context,_=n.build_context(*sample)
+    context['researchFormat']=True
+    with pytest.raises(ValueError): n.validate_answer(valid_brief(),context)
+
+
+def test_research_placeholder_references_are_visible_but_unknowns_rejected(sample):
+    context,_=n.build_context(*sample);context['researchFormat']=True
+    body=research_brief()
+    body['insights'][0]['text']+='营收为{{Q_REVENUE}}。'
+    answer=n.validate_answer(body,context)
+    assert 'Q_REVENUE' in answer['insights'][0]['citations']
+    body['insights'][0]['text']+='未知数{{UNKNOWN}}。'
+    with pytest.raises(ValueError):n.validate_answer(body,context)
+
+
+def test_deep_report_schema_requires_expanded_analysis(sample,monkeypatch):
+    context,_=n.build_context(*sample);context['researchFormat']=True
+    def handler(request):
+        payload=json.loads(request.content)
+        schema=payload['text']['format']['schema']
+        assert schema['properties']['insights']['minItems']==3
+        assert schema['$defs']['ResearchClaim']['properties']['text']['minLength']==40
+        assert payload['max_output_tokens']==18000
+        assert '四十五汉字' not in payload['instructions']
+        evidence=json.loads(payload['input'][0]['content'])['evidence']
+        assert 'M_PROFIT_QOQ' not in evidence['registry']
+        assert 'M_PROFIT_QOQ' not in schema['$defs']['ResearchClaim']['properties']['citations']['items']['enum']
+        assert evidence['unavailableIndicators']
+        return httpx.Response(429,json={})
+    mock_http(monkeypatch,handler)
+    token=n.DEPTH.set('deep')
+    try:
+        with pytest.raises(n.AIError):asyncio.run(n.call_openai(context,[],'分析'))
+    finally:n.DEPTH.reset(token)
+
+
+def test_long_report_can_preserve_all_verified_references(sample):
+    context,_=n.build_context(*sample);context['researchFormat']=True
+    body=research_brief()
+    for i in range(16):
+        context['registry']['TEST_'+str(i)]={**context['registry']['Q_REVENUE']}
+        body['conclusion']['text']+='{{TEST_'+str(i)+'}}。'
+    result=n.validate_answer(body,context)
+    assert len(result['conclusion']['citations'])==17
+    body['conclusion']['text']+='{{M_PROFIT_QOQ}}'
+    with pytest.raises(ValueError):n.validate_answer(body,context)
+
+
+def test_research_schema_vocabulary_is_not_reader_facing(sample):
+    context,_=n.build_context(*sample);context['researchFormat']=True
+    body=research_brief();body['conclusion']['text']+='citations里的证据应与registry一起核对。'
+    result=n.validate_answer(body,context)
+    assert 'citations' not in result['conclusion']['text']
+    assert 'registry' not in result['conclusion']['text']
+    assert '证据引用' in result['conclusion']['text']
+
+
+@pytest.mark.parametrize('repair_valid',[True,False])
+def test_research_validation_repair_is_bounded_and_revalidated(sample,monkeypatch,repair_valid):
+    context,_=n.build_context(*sample);context['researchFormat']=True
+    requests=[]
+    def handler(request):
+        payload=json.loads(request.content);requests.append(payload)
+        body=research_brief()
+        if len(requests)==1 or not repair_valid:
+            body['conclusion']['text']+='无依据的数值999。'
+        return httpx.Response(200,json={'status':'completed','output':[{'type':'message','content':[{'type':'output_text','text':json.dumps(body)}]}]})
+    mock_http(monkeypatch,handler)
+    if repair_valid:
+        result=asyncio.run(n.call_openai(context,[],'分析'))
+        assert '999' not in result['answer']['conclusion']['text']
+    else:
+        result=asyncio.run(n.call_openai(context,[],'分析'))
+        assert result['chargeable'] is False
+        assert '999' not in json.dumps(result['answer'])
+    assert len(requests)==2
+    assert 'validation_repair' in requests[1]['input'][-1]['content']
+
+
+@pytest.mark.parametrize('mode',['financials','fundamentals'])
+@pytest.mark.parametrize('status',[429,503,504])
+def test_unavailable_ai_still_provides_labelled_evidence_reading(sample,monkeypatch,mode,status):
+    report,q,req=sample;req.mode=mode
+    async def fail(*args,**kwargs):raise n.AIError(status,'unavailable')
+    monkeypatch.setattr(n,'call_openai',fail)
+    result=asyncio.run(n.explain(report,q,req))
+    assert result['outputMode']=='basic' and result['chargeable'] is False
+    assert len(result['answer']['insights'])>=3
+    assert all(i in result['citations'] for x in result['answer']['insights'] for i in x['citations'])
+
+
+def test_recovery_retains_valid_sections_and_removes_bad_numbers(sample):
+    context,_=n.build_context(*sample);context['researchFormat']=True
+    raw=research_brief();raw['insights'].append({**raw['conclusion'],'text':'虚构999。'})
+    result=n.readable_recovery(context,raw)
+    assert result['outputMode']=='partial'
+    assert '999' not in json.dumps(result)
+
+
+def test_readability_moves_numeric_detail_out_of_the_conclusion():
+    raw=research_brief()
+    n.check_readability(raw)
+    raw['conclusion']['text']+='{{Q_REVENUE}}'
+    with pytest.raises(ValueError):n.check_readability(raw)
+
+
+def test_style_alone_never_discards_a_verified_report(sample,monkeypatch):
+    context,_=n.build_context(*sample);context['researchFormat']=True
+    raw=research_brief();raw['insights'][0]['text']+='{{Q_REVENUE}}{{Q_NET_INCOME}}'
+    calls=[]
+    def handler(request):
+        calls.append(True)
+        return httpx.Response(200,json={'status':'completed','output':[{'type':'message','content':[{'type':'output_text','text':json.dumps(raw)}]}]})
+    mock_http(monkeypatch,handler)
+    result=asyncio.run(n.call_openai(context,[],'分析'))
+    assert len(calls)==2 and 'answer' in result
+    assert result.get('outputMode','complete')=='complete'
+    raw=research_brief();raw['insights'][0]['text']+='{{Q_REVENUE}}{{Q_NET_INCOME}}'
+    with pytest.raises(ValueError):n.check_readability(raw)

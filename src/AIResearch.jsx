@@ -1,4 +1,5 @@
 import {customerMessage} from './customer-message';
+import {subscribeAuthChange} from './auth-state';
 import AnalysisDepth from './AnalysisDepth';
 import { useEffect, useRef, useState } from "react";
 import {
@@ -25,6 +26,7 @@ async function jsonRequest(url, options = {}) {
         ? body.detail
         : "请求参数不完整，请检查当前财报与假设。",
     );
+    if(response.status===401) location.hash='#login?next='+encodeURIComponent(location.hash.slice(1).split('?')[0]||'overview');
     error.status = response.status;
     throw error;
   }
@@ -83,7 +85,9 @@ export default function AIResearch({
   useEffect(() => {
     alive.current = true;
     check();
+    const unsubscribe=subscribeAuthChange(check);
     return () => {
+      unsubscribe();
       alive.current = false;
       controller.current?.abort();
     };
@@ -231,13 +235,14 @@ export default function AIResearch({
     <div className={`ai-claim ${lead ? "ai-conclusion" : ""}`}>
       <span className={`ai-kind ${item.kind}`}>
         {
-          { fact: "数据事实", inference: "AI 推论", hypothesis: "条件假设" }[
+          { fact: "数据事实", inference: "研究判断", hypothesis: mode === 'financials' ? "条件判断" : "估值情景" }[
             item.kind
           ]
         }
       </span>
-      <p>{item.text}</p>
-      <div className="ai-citations">
+      {item.title&&<h3>{item.title}</h3>}
+      {item.text.split(/\n+/).map((paragraph,i)=><p key={i}>{paragraph}</p>)}
+      <details className="ai-evidence"><summary>查看数据依据 · {item.citations.length} 项</summary><div className="ai-citations">
         {item.citations.map((id) => {
           const c = turn.citations[id];
           return (
@@ -251,7 +256,7 @@ export default function AIResearch({
             </button>
           );
         })}
-      </div>
+      </div></details>
     </div>
   );
   return (
@@ -273,7 +278,7 @@ export default function AIResearch({
           </p>
         </div>
         <div className="ai-controls">
-          <AnalysisDepth value={analysisDepth} disabled={busy} onChange={setAnalysisDepth}/>
+          <AnalysisDepth value={analysisDepth} disabled={busy} onChange={value=>{if(value!==analysisDepth){reset();setAnalysisDepth(value);}}}/>
           <div className="ai-actions">
           <button className="button" disabled={!turns.length||saving||busy} onClick={saveResearch}>{saving?'保存中…':'保存研究'}</button>
           <span className="badge">
@@ -339,7 +344,7 @@ export default function AIResearch({
         {turns.map((turn, i) => (
           <article key={`${turn.conversationId}-${turn.turn}`}>
             <div className="ai-turn-heading">
-              <span>{i === 0 ? "核心解读" : `追问 ${i}`}</span>
+              <span>{turn.outputMode === 'basic' ? '基础解读' : turn.outputMode === 'partial' ? '已确认的分析' : turn.analysisDepth === "deep" ? "深度研究报告" : "研究解读"}{i>0 ? ` · 追问 ${i}` : ""}</span>
               <small>
                 {new Date(turn.generatedAt).toLocaleTimeString("zh-CN", {
                   timeZone: "Australia/Sydney",
@@ -350,6 +355,7 @@ export default function AIResearch({
               </small>
             </div>
             {i > 0 && <p className="ai-question">{turn.question}</p>}
+            {turn.notice && <p className="ai-note" role="status">{turn.notice}</p>}
             {claim(turn.answer.conclusion, turn, true)}
             <div className="ai-insights">
               {turn.answer.insights.map((item, n) => (
@@ -373,6 +379,7 @@ export default function AIResearch({
       {error && (
         <div className="r-alert" role="alert">
           {customerMessage(error)}
+          {!turns.length && <div><strong>先看当前数据能告诉我们什么</strong><p>{mode === 'financials' ? '机会在于收入增长能否留下更多利润；风险在于利润增加，现金却没有跟上。先对照上方收入、利润和现金流，再看资本投入与债务压力。' : '先区分生意好不好和价格合不合适。经营持续改善是机会，价格已经包含过高期待则是风险；比较页面报价与估值情景，并检查增长、利润率假设是否合理。'}</p><p>后续关注：增长是否持续、现金是否跟上，以及哪些变化会让当前判断失效。以上是阅读提示，不代表本次完整 AI 分析已完成。</p></div>}
           {needsReset && (
             <button className="button" onClick={reset}>
               开始新解读
