@@ -1,0 +1,44 @@
+/* Shared customer interface: readable secondary text and consistent controls. */
+.page-content { min-width: 0; }
+.page-heading { gap: 20px; }
+.page-heading > div:first-child { min-width: 0; }
+.page-heading p { line-height: 1.75; }
+.workspace > main > footer { gap: 24px; font-size: 12px; }
+.workspace > main > footer > span { white-space: nowrap; font-size: 12px; }
+.workspace > main > footer p { font-size: 11px; line-height: 1.8; }
+.workspace > main > footer button { font-size: 12px; white-space: nowrap; min-height: 36px; }
+.settings-panel .connection-row { gap: 16px; align-items: center; }
+.connection-row > span:first-child { min-width: 0; line-height: 1.6; }
+.connection-row .badge { flex-shrink: 0; }
+.settings-panel .fine-print, .settings-panel .setting-row p { font-size: 12px; line-height: 1.75; }
+.news-item-title { color: var(--text); }
+.quant-toolbar, .market-heading, .macro-toolbar { gap: 16px; }
+.option-parameters > label { min-width: 130px; }
+.option-parameters select, .option-parameters input { min-height: 40px; }
+.source-record a { overflow-wrap: anywhere; }
+.r-alert, .quant-error, .news-error, .macro-warning, .home-error { overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .option-parameters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 14px; }
+  .option-parameters > label { min-width: 0; }
+  .option-parameters > label:first-child { grid-column: 1 / -1; }
+  .option-parameters input, .option-parameters select { width: 100%; min-width: 0; }
+  .option-parameters > button { grid-column: 1 / -1; min-height: 40px; }
+  .workspace > main > footer { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+  .workspace > main > footer p { grid-column: 1 / -1; order: 3; text-align: left; margin: 0; }
+  .workspace > main > footer .brand-motto { font-size: 12px; }
+  .settings-panel .connection-row { gap: 10px; }
+  .settings-panel .connection-row > span:first-child { font-size: 12px; }
+  .settings-panel .connection-row .badge { font-size: 10px; }
+  .news-bottom-note, .quant-muted, .macro-muted, .r-table-note, .fine-print { font-size: 12px; line-height: 1.75; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-content, .daily-paper, .strategy-main, .option-body { animation: none; }
+}
+
+.academy-banner .eyebrow, .academy-banner p { color: var(--on-accent); opacity: .82; }
+.real-news-item h3 a { color: var(--text); }
+.real-news-list > .home-pager { margin: 0 24px; padding: 16px 0; }
+@media (max-width: 700px) {
+  .option-parameters > label input, .option-parameters > label select { width: 100%; }
+  .real-news-list > .home-pager { margin: 0 16px; }
+}

@@ -1,3 +1,4 @@
+import {customerMessage} from './customer-message';
 import { useEffect, useRef, useState } from "react";
 import { Search, ArrowRight, RefreshCw } from "lucide-react";
 import "./stock-search.css";
@@ -61,13 +62,13 @@ export default function StockSearch({symbol, onSelect}) {
     {open&&<div className="stock-results-panel">
       <div className="stock-results-meta"><span>SEC 官方证券目录{meta?` · ${meta.directoryCount.toLocaleString()} 条记录`:""}</span><small>选择后核验财报与模型适用性</small></div>
       {busy&&<p role="status">正在匹配代码和公司名称…</p>}
-      {error&&<p role="alert">{error}</p>}
+      {error&&<p role="alert">{customerMessage(error)}</p>}
       {!busy&&!error&&!results.length&&<p role="status">未找到匹配项。请核对股票代码；也可输入完整英文公司名。</p>}
       <div id="stock-search-results" role="listbox" aria-label="股票搜索结果">{results.map((r,i)=><button type="button" role="option" aria-selected={active===i} id={`stock-result-${i}`} className={active===i?"active":""} key={r.symbol} onPointerDown={(e)=>e.preventDefault()} onClick={()=>choose(r.symbol)}><strong>{r.symbol}</strong><span>{r.name}<small>CIK {r.cik}</small></span><em>{r.exchange||"未确认交易所"}</em><ArrowRight size={13}/></button>)}</div>
-      {meta?.source.stale&&<p>正在使用缓存目录，代码变更信息可能延迟。</p>}
+      {meta?.source.stale&&<p>当前使用上次更新的公司目录，股票代码变更可能尚未收录。</p>}
     </div>}
     <div className="stock-shortcuts"><span>快捷研究</span>{featured.map(([s,n])=><button key={s} className={symbol===s?"active":""} onClick={()=>choose(s)}>{s}<small>{n}</small></button>)}</div>
     {!!recent.length&&<div className="stock-recent"><span>最近研究</span>{recent.map((s)=><button key={s} onClick={()=>choose(s)}>{s}</button>)}</div>}
-    <p className="stock-coverage-note">自动识别上市公司 · 财报采用 US GAAP 标准标签 · 特殊申报和估值口径会单独提示</p>
+    <p className="stock-coverage-note">自动识别上市公司 · 财报依据美国会计准则披露 · 特殊申报和估值口径会单独提示</p>
   </div>;
 }

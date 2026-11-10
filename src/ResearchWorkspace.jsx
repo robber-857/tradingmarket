@@ -1,3 +1,4 @@
+import {customerMessage} from './customer-message';
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -415,7 +416,7 @@ export default function ResearchWorkspace({
         <section className="panel empty-state">
           <Info size={30} />
           <h2>暂时无法生成该证券的研究</h2>
-          <p role="alert">{error}</p>
+          <p role="alert">{customerMessage(error)}</p>
           <button
             className="button primary"
             onClick={() => setReload((v) => v + 1)}
@@ -491,10 +492,10 @@ export default function ResearchWorkspace({
             {report.sources.some((s) => s.stale) && (
               <div className="r-alert" role="status">
                 SEC
-                更新失败，当前使用历史缓存。采集时间见下方来源记录，不代表最新申报。
+                更新未完成，当前保留上次取得的数据。采集时间见下方来源记录，不代表最新申报。
               </div>
             )}
-            {report.latestFiledReportEnd !== report.latestReportEnd && report.latestFiledReportEnd && <p className="r-alert">最新申报期 {report.latestFiledReportEnd} 尚无法完整映射，当前展示可解析的报告期；请核对最新原文。</p>}
+            {report.latestFiledReportEnd !== report.latestReportEnd && report.latestFiledReportEnd && <p className="r-alert">最新申报期 {report.latestFiledReportEnd} 尚未取得完整数据，当前展示已有完整数据的报告期；请核对最新原文。</p>}
             {report.company.industry && <p className="stock-coverage-note">{report.company.exchange} · {report.company.industry} · CIK {report.company.cik}</p>}
             {mode === "financials" ? (
               <>
@@ -1064,7 +1065,7 @@ function ValuationPanel({ report, quarter, onInspect }) {
               <strong>
                 {fmt(busy ? null : result?.base.marginOfSafety, "percent")}
               </strong>
-              <small>1 − 行情快照价格 / 模型每股价值</small>
+              <small>1 − 当前参考报价 / 模型每股价值</small>
             </div>
           </div>
           <details className="r-advanced">
@@ -1459,7 +1460,7 @@ function WaccBuilder({ taxRate, onApply, market }) {
       <button className="button" type="submit">
         计算 WACC
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{customerMessage(error)}</p>}
       {output && (
         <div className="wacc-result">
           <span>

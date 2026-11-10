@@ -1,3 +1,4 @@
+import {customerMessage} from './customer-message';
 import { useEffect, useRef, useState } from "react";
 import {
   Sparkles,
@@ -350,7 +351,7 @@ export default function AIResearch({
       )}
       {error && (
         <div className="r-alert" role="alert">
-          {error}
+          {customerMessage(error)}
           {needsReset && (
             <button className="button" onClick={reset}>
               开始新解读

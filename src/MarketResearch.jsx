@@ -1,3 +1,4 @@
+import {customerMessage} from './customer-message';
 import { useEffect, useState } from "react";
 import { RefreshCw, ArrowUpRight, Download } from "lucide-react";
 import "./market-research.css";
@@ -73,8 +74,8 @@ export default function MarketResearch({market, symbol, enabled, onAsk}) {
       <button className="button" onClick={refresh} disabled={busy || !enabled}><RefreshCw size={14} className={busy ? "market-spin" : ""}/>{busy ? "正在获取" : "刷新行情"}</button>
     </div>
     {!enabled ? <p className="r-alert">历史报告期保留独立估值。切回「最新可得」报告期，即可启用当前报价、自动倍数和 Beta，避免混淆历史与当前时点。</p> : <>
-      {busy && <p role="status" className="market-loading">正在核对报价、股票与 SPY 日线。首次加载通常需要约半分钟，缓存命中后更快。</p>}
-      {error && <p role="alert" className="r-alert">{error}</p>}
+      {busy && <p role="status" className="market-loading">正在核对报价、股票与 SPY 日线。首次加载通常需要约半分钟。</p>}
+      {error && <p role="alert" className="r-alert">{customerMessage(error)}</p>}
       <div className="market-body">
         <div>
           <div className="market-quote"><span>{symbol} / USD</span><strong>{quote ? `$${quote.price.toFixed(2)}` : "—"}</strong><em>{quote ? quote.stale ? "报价过期 · 未用于估值" : quote.marketOpen ? "交易时段报价" : "最近可得报价 · 休市" : "等待数据源"}</em></div>
@@ -89,7 +90,7 @@ export default function MarketResearch({market, symbol, enabled, onAsk}) {
           <small>历史价格回归，不是未来风险预测。CAPM 试算会自动带入此 Beta。</small>
         </aside>
       </div>
-      {!!data?.issues.length && <details className="market-issues"><summary>数据状态 · {data.issues.length} 项待核对</summary>{data.issues.map((s,i)=><p key={i}>{s}</p>)}</details>}
+      {!!data?.issues.length && <details className="market-issues"><summary>数据状态 · {data.issues.length} 项待核对</summary>{data.issues.map((s,i)=><p key={i}>{customerMessage(s)}</p>)}</details>}
       <footer><span>来源 <a href="https://twelvedata.com" target="_blank" rel="noreferrer">Twelve Data</a> · 默认实时源覆盖部分交易场所</span>{data && <button onClick={download}><Download size={12}/>导出行情与计算依据</button>}</footer>
     </>}
   </section>;

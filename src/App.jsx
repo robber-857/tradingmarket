@@ -978,7 +978,7 @@ export default function App() {
           <div className="setting-row">
             <div>
               <strong>每日市场简报</strong>
-              <p>保存订阅意向，暂未连接邮件服务</p>
+              <p>保存邮件订阅偏好；邮件推送暂未开放</p>
             </div>
             <button
               role="switch"
@@ -995,21 +995,21 @@ export default function App() {
         </section>
         <section className="panel settings-panel">
           <PanelTitle
-            title="数据连接"
-            sub="财报、研究行情与官方宏观数据已集成；市场新闻已连接公开来源；情绪看板仍为演示。"
+            title="数据来源"
+            sub="了解研究内容的来源与覆盖范围。具体可用性以各页面的更新状态为准。"
           />
           {[
             "Twelve Data 研究行情",
             "市场新闻",
             "BLS / BEA / 美联储宏观数据",
             "SEC 公司财报",
-            "X 授权数据接口",
-            "链上数据供应商",
+            "X 社区内容",
+            "链上数据",
           ].map((t) => (
             <div className="connection-row" key={t}>
               <span>{t}</span>
               <Badge tone={t === "SEC 公司财报" || t === "Twelve Data 研究行情" || t === "BLS / BEA / 美联储宏观数据" || t === "市场新闻" ? "green" : ""}>
-                {t === "SEC 公司财报" ? "已集成 · 动态代码目录" : t === "Twelve Data 研究行情" ? "已集成 · 按代码获取" : t === "BLS / BEA / 美联储宏观数据" ? "已集成 · 免费官方来源" : t === "市场新闻" ? "已集成 · 公开 RSS" : "待接入"}
+                {t === "SEC 公司财报" ? "官方财报" : t === "Twelve Data 研究行情" ? "股票行情" : t === "BLS / BEA / 美联储宏观数据" ? "官方发布" : t === "市场新闻" ? "公开新闻" : "暂未开放"}
               </Badge>
             </div>
           ))}
@@ -1143,8 +1143,8 @@ export default function App() {
             <label className="theme-picker">
               {theme === "darkness" ? <Moon size={15} /> : <Sun size={15} />}
               <select aria-label="界面主题" value={theme} onChange={(event) => setTheme(event.target.value)}>
-                <option value="lightness">Lightness</option>
-                <option value="darkness">Darkness</option>
+                <option value="lightness">浅色</option>
+                <option value="darkness">深色</option>
               </select>
             </label>
             <button
@@ -1195,12 +1195,12 @@ export default function App() {
                 <span className="status-dot" />
                 {["overview", "financials", "fundamentals", "calendar", "news", "daily", "options", "strategies"].includes(page)
                   ? ({overview:"每日关注",calendar:"宏观数据",news:"真实新闻",daily:"AI 每日简报",options:"延迟期权链",strategies:"策略研究"}[page] || "财报研究")
-                  : "演示模式"}
+                  : ({settings:"个人偏好",watchlist:"自选研究",academy:"学习中心"}[page] || "示例内容")}
               </Badge>
-              {!["overview", "financials", "fundamentals", "calendar", "news", "daily", "options", "strategies"].includes(page) && (
+              {page === "sentiment" && (
                 <button className="button" onClick={exportBrief}>
                   <Download size={15} />
-                  <span>导出简报</span>
+                  <span>导出示例简报</span>
                 </button>
               )}
             </div>
@@ -1606,7 +1606,7 @@ export default function App() {
             <Badge>创作者工作台 · 体验版</Badge>
             <h2>发布知识内容</h2>
             <p>
-              内容只保存在此浏览器，刷新后可继续查看。正式发布需要后台账户与权限。
+              内容仅自己可见，保存后可继续编辑。公开发布暂未开放。
             </p>
             <form
               className="publish-form"
@@ -1713,7 +1713,7 @@ export default function App() {
               <h3>研究有据</h3>
               <p>财报研究依据 SEC 官方披露，财务指标与估值提供计算口径、来源和假设。新闻与宏观事件保留来源和时间，缺失数据明确标注。AI 辅助解释已有信息，区分事实、推论与条件假设，不代替独立判断。</p>
               <h3>如何理解观点与情绪</h3>
-              <p>观点与情绪页面目前展示示例内容。观点占比描述样本中的分类分布，不代表未来上涨概率，也不构成买卖建议。</p>
+              <p>机构公开观点可在宏观事件中查看；独立情绪页面目前展示示例内容。观点占比描述样本中的分类分布，不代表未来上涨概率，也不构成买卖建议。</p>
               <h3>你的研究记录</h3>
               <p>关注、收藏与学习进度会保留在当前浏览器，暂不支持跨设备同步。清除浏览器数据可能导致这些记录丢失。</p>
             </div>

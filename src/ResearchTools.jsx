@@ -1,3 +1,4 @@
+import {customerMessage} from './customer-message';
 import { useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 
@@ -298,7 +299,7 @@ export function BetaEstimator({ onApply }) {
       </button>
       {error && (
         <p className="r-alert" role="alert">
-          {error}
+          {customerMessage(error)}
         </p>
       )}
       {result && (

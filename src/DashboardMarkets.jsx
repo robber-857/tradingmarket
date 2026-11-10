@@ -1,3 +1,4 @@
+import {customerMessage} from './customer-message';
 import {useEffect,useState} from 'react';
 import {ArrowUpRight,Check,ChevronLeft,ChevronRight,SlidersHorizontal} from 'lucide-react';
 import {readJson} from './EvidenceAnswer';
@@ -32,7 +33,7 @@ export default function DashboardMarkets({refresh,timezone}){
   return <section className="panel dashboard-markets" aria-label="关注市场行情">
     <div className="panel-title"><div><h2>关注市场</h2><p>主要指数与跨资产行情 · 近一个月走势</p></div><button className="button" aria-expanded={editing} aria-controls="overview-market-picker" onClick={()=>setEditing(v=>!v)}><SlidersHorizontal size={14}/>自选指标</button></div>
     {editing&&<div className="overview-market-picker" id="overview-market-picker"><div><strong>选择要关注的市场</strong><button className="home-text-action" onClick={()=>{setSelected([...DEFAULT_MARKETS]);setPage(0);}}>恢复默认</button></div><div className="overview-market-picker-options">{choices.map(([id,label])=><button key={id} aria-pressed={selected.includes(id)} onClick={()=>toggle(id)}><span className="overview-market-check">{selected.includes(id)&&<Check size={12}/>}</span>{label}</button>)}</div><small>{storageError?'浏览器无法保存设置，本次选择仅在当前页面有效。':'选择自动保存在当前浏览器。'}</small><button className="home-text-action" onClick={()=>setEditing(false)}>完成</button></div>}
-    {error&&<p className="home-error" role="alert">{error}{data?' 当前保留上次结果。':''}</p>}
+    {error&&<p className="home-error" role="alert">{customerMessage(error)}{data?' 当前保留上次结果。':''}</p>}
     <div className="overview-market-quotes">{pageItems(selected,page,4).map(id=>{
       const item=data?.items.find(i=>i.id===id),available=item?.available,change=item?.change;
       const tone=error||item?.stale?'muted':change==null||change===0?'flat':change>0?'up':'down';
@@ -43,7 +44,7 @@ export default function DashboardMarkets({refresh,timezone}){
         <strong className="overview-market-price">{available?number(item.price,yieldQuote?3:2):'—'}{available&&yieldQuote&&<small>%</small>}</strong>
         <div className="overview-market-change">{change!=null?<><span>{change>0?'+':''}{number(yieldQuote?change*100:change)}{yieldQuote?' bp':''}</span>{!yieldQuote&&<span>({change>0?'+':''}{number(item.changePct)}%)</span>}</>:<span>{loading?'读取中…':'涨跌数据暂缺'}</span>}<small>{change!=null?'较前收盘':''}</small></div>
         <Sparkline items={item?.history||[]} name={item?.name||id}/>
-        <div className="overview-market-quote-time">{item?.asOf?new Intl.DateTimeFormat('zh-CN',{timeZone:timezone,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(item.asOf)):'尚未取得报价'}<span>{error||item?.stale?'更新失败 · 缓存':!available?loading?'读取中':'暂不可用':item?.quoteOld?'较早报价':'参考行情'}</span></div>
+        <div className="overview-market-quote-time">{item?.asOf?new Intl.DateTimeFormat('zh-CN',{timeZone:timezone,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(item.asOf)):'尚未取得报价'}<span>{error||item?.stale?'更新未完成 · 上次报价':!available?loading?'读取中':'暂不可用':item?.quoteOld?'较早报价':'参考行情'}</span></div>
       </article>;
     })}</div>
     {!selected.length&&<p className="home-empty">还没有关注的市场。点击“自选指标”添加，或恢复默认四项。</p>}
