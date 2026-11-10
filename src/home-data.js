@@ -32,7 +32,7 @@ export function agenda(events=[],now=Date.now()) {
   for(const e of sorted){const key=e.group+'|'+e.releaseAt;if(!grouped.has(key))grouped.set(key,{...e,displayStatus:eventState(e,now)});}
   const rows=[...grouped.values()];
   const upcoming=rows.filter(e=>['upcoming','date-only'].includes(e.displayStatus));
-  const sevenDays=upcoming.filter(e=>e.timePrecision==='date-only'?dayKey(e.releaseAt,'America/New_York')<=dayKey(now+7*86400000,'America/New_York'):Date.parse(e.releaseAt)<=now+7*86400000);
+  const sevenDays=upcoming.filter(e=>e.timePrecision!=='estimated' && (e.timePrecision==='date-only'?dayKey(e.releaseAt,'America/New_York')<=dayKey(now+7*86400000,'America/New_York'):Date.parse(e.releaseAt)<=now+7*86400000));
   const recent=rows.filter(e=>['pending','released'].includes(e.displayStatus)&&now-Date.parse(e.releaseAt)<=2*86400000).reverse();
   return {upcoming,sevenDays,recent,visible:[...recent.filter(e=>e.displayStatus==='pending'),...upcoming,...recent.filter(e=>e.displayStatus==='released')]};
 }
@@ -41,4 +41,9 @@ export function releaseLabel(event,zone) {
   const dateOnly=event.timePrecision==='date-only';
   return new Intl.DateTimeFormat('zh-CN',{timeZone:dateOnly?'America/New_York':zone,month:'2-digit',day:'2-digit',...(!dateOnly&&{hour:'2-digit',minute:'2-digit',hour12:false})}).format(new Date(event.releaseAt))+
     (dateOnly?' 美东 · 时刻待确认':` ${zoneNames[zone]||zone}${event.timePrecision==='estimated'?' · 暂定':''}`);
+}
+
+export function sevenDayEvents(events=[],now=Date.now()) {
+  const keys=new Set(agenda(events,now).sevenDays.map(e=>e.group+"|"+e.releaseAt));
+  return events.filter(e=>e.timePrecision!=="estimated" && keys.has(e.group+"|"+e.releaseAt));
 }

@@ -293,17 +293,19 @@ def validate_answer(raw, context):
     return data
 
 
-async def call_openai(context, history, question, *, instructions=None, validator=None):
+async def call_openai(context, history, question, *, instructions=None, validator=None, reasoning_effort='medium'):
     key,model = settings()
     if not key:
         raise AIError(503,'尚未配置 OPENAI_API_KEY，请在项目根目录 .env 填写后点击“检查配置”。')
     # Send compact facts, not raw filings, account details, or SEC contact identity.
     compact = {**context,'registry':{k:{a:b for a,b in v.items() if a!='evidence'} for k,v in context['registry'].items()}}
     schema=Brief.model_json_schema()
+    if context.get('mode') == 'macro' and 'E_BANK_SUMMARY' in context['registry']:
+        schema['properties']['insights'].update(minItems=3, maxItems=3)
     schema['$defs']['Claim']['properties']['citations']['items']={'type':'string','enum':list(context['registry'])}
     payload = {'model':model,'store':False,'instructions':instructions or INSTRUCTIONS,
         'input':[{'role':'user','content':json.dumps({'evidence':compact,'history':history,'question':question},ensure_ascii=False)}],
-        'reasoning':{'effort':'medium'}, 'max_output_tokens':6000,
+        'reasoning':{'effort':reasoning_effort}, 'max_output_tokens':6000,
         'text':{'format':{'type':'json_schema','name':'research_brief','strict':True,'schema':schema}}}
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(90,connect=10)) as client:

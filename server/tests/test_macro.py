@@ -153,6 +153,34 @@ def test_ai_bound_numbers_missing_and_fake_consensus():
         with pytest.raises(ValueError): macro_ai.validate(raw, ctx)
 
 
+def test_ai_institution_dispersion_excludes_models_stale_and_wrong_period():
+    from server import public_forecasts as pf
+    rows = []
+    for ident, value, kind, period, stale in [('a', '.2', 'institution', '2026-09', False), ('b', '.4', 'institution', '2026-09', False), ('c', '9', 'model', '2026-09', False), ('d', '8', 'institution', '2026-09', True), ('e', '7', 'institution', '2026-08', False)]:
+        r = pf.record('cpi_mom', period, str(float(value)), kind, ident, 'https://www.bls.gov/cpi/', '2026-10-01', '2026-10-15T00:00:00Z', source_id=ident)
+        r.update(stale=stale, collectedAfterRelease=True)
+        rows.append(r)
+    ctx = macro_ai.context_for(sample(title='CPI 环比（季调）', actual=macro.metric('0.5', '%'), publicForecasts=rows))
+    reg = ctx['registry']
+    assert reg['E_BANK_COUNT']['value'] == 2
+    assert reg['E_BANK_SPREAD']['value'] == .2
+    assert reg['E_BANK_DELTA_0']['display'] == '+0.3百分点'
+    assert reg['E_BANK_DELTA_1']['display'] == '+0.1百分点'
+    assert 'E_BANK_DELTA_2' not in reg
+    assert len(reg['E_BANK_MIN']['sources']) == 2
+    assert reg['E_BANK_DELTA_0']['collectedAfterRelease'] is True
+    for r in rows:
+        r['indicator'] = 'pce_mom'
+    pce = macro_ai.context_for(sample(title='PCE 环比', reference='September 2026', publicForecasts=rows))
+    assert pce['registry']['E_BANK_COUNT']['value'] == 2
+
+
+def test_unreleased_market_effect_is_hypothesis():
+    ctx = macro_ai.context_for(sample())
+    result = macro_ai.validate(raw_answer('若通胀偏高，美股可能承压。', ['E_EVENT']), ctx)
+    assert result['conclusion']['kind'] == 'hypothesis'
+
+
 def test_ai_followup_and_snapshot_binding(monkeypatch):
     first = macro.finalize(sample(actual=macro.metric('0.3%', '%')))
     second = macro.finalize(sample(actual=macro.metric('0.4%', '%')))

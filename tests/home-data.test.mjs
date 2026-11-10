@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {agenda,dayKey,eventState,latestReady,newsSelection,recentNews,releaseLabel} from '../src/home-data.js';
+import {agenda,sevenDayEvents,dayKey,eventState,latestReady,newsSelection,recentNews,releaseLabel} from '../src/home-data.js';
 
 const now=Date.parse('2026-11-10T00:00:00Z');
 const article=(id,age,categories=['stocks'],stale=false)=>({id,publishedAt:new Date(now-age*3600000).toISOString(),categories,stale});
@@ -55,4 +55,11 @@ test('recent missing release stays visible ahead of future events; ancient pendi
   const rows=[event('pending','2026-11-09T13:30:00Z'),event('future','2026-11-12T13:30:00Z'),event('old','2026-11-01T13:30:00Z')];
   assert.deepEqual(agenda(rows,now).visible.map(e=>e.id),['pending','future']);
   assert.deepEqual(agenda([],now).visible,[]);
+});
+
+test('seven-day destination retains all indicators and excludes estimated, past and beyond boundary',()=>{
+  const end=new Date(now+7*86400000).toISOString();
+  const rows=[event('headline',end),event('core',end,{title:'核心 CPI'}),event('estimated','2026-11-11T13:30:00Z',{timePrecision:'estimated'}),event('past','2026-11-08T13:30:00Z'),event('late',new Date(now+7*86400000+1).toISOString())];
+  assert.equal(agenda(rows,now).sevenDays.length,1);
+  assert.deepEqual(sevenDayEvents(rows,now).map(e=>e.id),['headline','core']);
 });

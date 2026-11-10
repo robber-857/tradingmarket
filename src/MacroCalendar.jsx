@@ -1,3 +1,4 @@
+import {dayKey, sevenDayEvents} from "./home-data";
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Clock3, RefreshCw, Sparkles, Send, CalendarDays } from 'lucide-react';
 import './macro-calendar.css';
@@ -7,9 +8,9 @@ const descriptions = {
   release: '这项数据对外公布的日期和时间，按当前选择的时区显示；标记为暂定或时刻待确认时，请以官方日程为准。它不是数据所统计的月份。',
   period: '数据反映的月份或季度，不是公布时间。例如：11 月公布 10 月 CPI，统计所属期就是 10 月；环比比较 10 月与 9 月，同比比较当年 10 月与去年 10 月。',
   previous: '上一统计期的数值；利率决议通常指上次决议的利率。历史数据可能修订，具体版本以页面的数据来源与口径为准。',
-  forecast: '公布前市场对本期数据的一致预期，来自已接入的预期来源。暂无预期或横线表示没有取得可用预期，不代表零。',
+  forecast: '此处数值为公开来源转引的调查预期，不代表本站汇总的全市场共识。各家机构与模型预测在下方分开展示。暂无预期或横线表示没有取得可用预期，不代表零。',
   actual: '已取得的本期公布结果。待公布表示尚未到公布时间；尚未取得表示系统还没有取得可用数值，不代表零。',
-  surprise: '本期实际值减去一致预期，只有两者口径可比时才计算。正值表示高于预期，负值表示低于预期；不能直接等同于市场利好或利空。',
+  surprise: '本期实际值减去公开预期参考，只有两者口径可比时才计算。正值表示高于预期，负值表示低于预期；不能直接等同于市场利好或利空。',
 };
 const Help = ({ field, label }) => <FieldHelp label={label}>{descriptions[field]}</FieldHelp>;
 
@@ -56,15 +57,18 @@ function MacroExplanation({ event }) {
   }
   return <section className="macro-ai">
     <div className="macro-section-title"><Sparkles size={18} /><h3>AI 跨资产解读</h3><span>{event.actual ? '数据解读' : event.status === 'upcoming' ? '发布前情景' : '数据待核验'}</span></div>
-    {!turns.length && <><p>从这次事件出发，分别理解美股估值、增长预期与加密资产流动性。结论引用当前数据快照。</p>
+    {!turns.length && <><p>结合各家机构的预测区间与分歧，分析实际值高于、低于或落在区间内时，对美股和加密的可能影响。数据事实、分析推论与条件情景分别标注，引用当前快照。</p>
       <button className="button primary" onClick={() => ask()} disabled={busy}><Sparkles size={15} />{busy ? '正在分析…' : '分析对美股与 Crypto 的影响'}</button></>}
     <div className="macro-conversation" aria-live="polite">
       {turns.map((turn, index) => <article className="macro-answer" key={index}>
         {index > 0 && <div className="macro-question">{turn.question}</div>}
         {[turn.answer.conclusion, ...turn.answer.insights].map((claim, i) => <div className={i === 0 ? 'macro-conclusion' : 'macro-insight'} key={i}>
           <span className="macro-kind">{kinds[claim.kind]}</span><p>{claim.text}</p>
-          <div className="macro-citations">{claim.citations.map(id => <a key={id} href={turn.citations[id].sourceUrl} target="_blank" rel="noreferrer"
-            title={`${turn.citations[id].label}：${turn.citations[id].display}`}>{turn.citations[id].label}<ArrowUpRight size={11} /></a>)}</div>
+          <div className="macro-citations">{claim.citations.flatMap(id => {
+            const citation=turn.citations[id];
+            return (citation.sources || [citation]).map((source,j)=><a key={`${id}-${j}`} href={source.sourceUrl} target="_blank" rel="noreferrer"
+              title={`${citation.label}：${citation.display} · 来源更新 ${source.sourceUpdatedAt || '见原文'} · 收录 ${source.retrievedAt || turn.generatedAt}`}>{citation.label}{source.source ? ` · ${source.source}` : ''}<ArrowUpRight size={11} /></a>);
+          })}</div>
         </div>)}
         <p className="macro-watch"><b>继续观察</b>{turn.answer.watch_next}</p>
         <p className="macro-muted">{turn.answer.limitations}</p>
@@ -83,16 +87,95 @@ function MacroExplanation({ event }) {
   </section>;
 }
 
+function ForecastDate({ row, zone }) {
+  return <>{row.sourceUpdatedTimestamp ? new Intl.DateTimeFormat('zh-CN', {timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZoneName: 'short', hour12: false}).format(new Date(row.sourceUpdatedTimestamp)) : `${row.sourceUpdatedAt}（原文仅提供日期）`}</>;
+}
+
+const translationRequests = new Map();
+function InstitutionExcerpt({ row, snapshotId, zone }) {
+  const [language, setLanguage] = useState('zh');
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    const key = row.institutionView.excerpt;
+    setError('');
+    if (!translationRequests.has(key)) {
+      const request = fetch('/api/macro/institution-translation', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({snapshot_id:snapshotId,record_id:row.id})}).then(jsonResponse);
+      translationRequests.set(key, request);
+      request.catch(() => translationRequests.delete(key));
+    }
+    translationRequests.get(key).then(value => {if(active)setResult(value);}).catch(err => {if(active)setError(err.message);});
+    return () => { active = false; };
+  }, [row.id, snapshotId, attempt]);
+  return <>
+    <div className="macro-language-toggle" role="group" aria-label={`${row.source}观点语言`}>
+      <button aria-pressed={language==='zh'} onClick={()=>setLanguage('zh')}>中文 · AI 翻译</button>
+      <button aria-pressed={language==='en'} onClick={()=>setLanguage('en')}>英文原文</button>
+    </div>
+    {language==='en' ? <blockquote lang="en">{row.institutionView.excerpt}</blockquote>
+      : result ? <><span className="macro-kind">AI 翻译 · 机构原文节选</span><blockquote lang="zh-CN">{result.text}</blockquote>
+        <p className="macro-muted">仅翻译原文，不是 AI 市场推论；以英文原文为准。译于 {time(result.translatedAt, zone)}</p></>
+      : error ? <><p className="macro-warning" role="status">{error}</p><blockquote lang="en">{row.institutionView.excerpt}</blockquote><button className="button" onClick={()=>setAttempt(a=>a+1)}>重试中文翻译</button></>
+      : <p className="macro-muted" role="status">正在翻译机构原文… 可切换英文查看。</p>}
+  </>;
+}
+
+function InstitutionComparison({ event, rows, zone }) {
+  const comparison = event.institutionComparison;
+  const sorted = [...rows].sort((a,b) => Number(a.stale)-Number(b.stale) || a.metric.value-b.metric.value || a.source.localeCompare(b.source));
+  const difference = row => {
+    if (row.stale || !event.forecast || event.forecast.value == null || event.forecast.unit !== row.metric.unit) return '—';
+    const n = Number((row.metric.value-event.forecast.value).toFixed(8));
+    return `${n > 0 ? '+' : ''}${n.toLocaleString('zh-CN', {maximumFractionDigits: 8})} ${row.metric.unit === '%' ? '百分点' : '人'}`;
+  };
+  return <>
+    {comparison ? <div className="macro-bank-summary">
+      <strong>已收录 {comparison.count} 家 · 预测范围 {comparison.min.display} – {comparison.max.display}</strong>
+      <p>中位数 {comparison.median.display} · 最高与最低相差 {comparison.spread.value.toLocaleString('zh-CN', {maximumFractionDigits: 8})} {comparison.spread.unit}</p>
+      <p>来源日期 {comparison.earliestUpdate} 至 {comparison.latestUpdate}。仅反映已收录样本，更新时间不同，不代表全市场共识。</p>
+    </div> : <p className="macro-muted">当前可比机构不足两家，暂不计算分歧范围。</p>}
+    <div className="macro-bank-table-wrap"><table className="macro-bank-table" aria-label="机构预测对比">
+      <thead><tr><th>机构 / 来源更新</th><th>预测</th><th>与调查预期差</th></tr></thead>
+      <tbody>{sorted.map(row => <tr key={row.id} className={row.stale ? 'macro-bank-stale' : ''}>
+        <td><a href={row.sourceUrl} target="_blank" rel="noreferrer">{row.source}<ArrowUpRight size={11} /></a>
+          <small><ForecastDate row={row} zone={zone} /></small>
+          <small>收录 {time(row.retrievedAt, zone)}{row.collectedAfterRelease ? ' · 公布后收录' : ''}</small>
+          {row.stale && <small>旧记录，不纳入比较</small>}</td>
+        <td>{row.metric.display}</td><td>{difference(row)}</td>
+      </tr>)}</tbody>
+    </table></div>
+    <div className="macro-institution-views" aria-label="机构原文观点">
+      <h4>机构原文观点</h4>
+      <p className="macro-muted">默认展示机构原文节选的 AI 中文翻译，可切换英文原文。翻译不补写理由，也不代表下方 AI 的市场推论；完整判断与限定条件请阅读原文。</p>
+      {sorted.map(row => <article className="macro-source-view" key={row.id}>
+        <div><strong>{row.source}</strong><span className="macro-kind">{row.institutionView ? '机构原文观点' : '仅数值预测'}</span></div>
+        {row.institutionView ? <>
+          <InstitutionExcerpt key={row.id} row={row} snapshotId={event.snapshotId} zone={zone} />
+          <p className="macro-muted">发布：{time(row.institutionView.publishedAt, zone)} · 更新：<ForecastDate row={row} zone={zone} /></p>
+          <p className="macro-muted">原文收录：{time(row.institutionView.collectedAt, zone)}{row.collectedAfterRelease ? ' · 公布后收录，不代表当时系统已知' : ''}</p>
+        </> : <p className="macro-muted">目前仅收录数值预测，未取得可展示的原文观点或判断依据。不会用 AI 推论代替机构原话。</p>}
+        {row.stale && <p className="macro-warning">旧记录，仅供历史参考，未纳入当前分歧统计。</p>}
+        <a href={row.sourceUrl} target="_blank" rel="noreferrer">阅读机构原文与完整上下文<ArrowUpRight size={12}/></a>
+      </article>)}
+    </div>
+  </>;
+}
+
 function PublicForecasts({ event, zone }) {
   const rows = event.publicForecasts || [];
-  return <section className="macro-public-forecasts" aria-label="公开预测参考">
-    <h3>公开预测参考<Help field="forecast" label="预测来源" /></h3>
-    <p className="macro-muted">按本事件统计期与指标口径匹配。机构和模型预测不计入市场一致预期。</p>
-    {Object.entries({ consensus: '市场调查预期', institution: '机构预测', model: '模型预测' }).map(([kind, label]) => <div className="macro-forecast-group" key={kind}>
+  return <section className="macro-public-forecasts" aria-label="公开预期参考">
+    <h3>公开预期参考<Help field="forecast" label="预测来源" /></h3>
+    <p className="macro-muted">按本事件统计期与指标口径匹配。机构样本、调查预期和模型分别展示，不能混合为全市场共识。</p>
+    {Object.entries({ consensus: '市场调查预期', institution: '机构观点与分歧', model: '模型预测' }).map(([kind, label]) => <div className="macro-forecast-group" key={kind}>
       <h4>{label}</h4>
-      {rows.filter(r => r.kind === kind).length ? rows.filter(r => r.kind === kind).map(r => <article key={r.id} className="macro-forecast-row">
+      {kind === 'institution' && rows.some(r => r.kind === kind)
+        ? <InstitutionComparison event={event} rows={rows.filter(r => r.kind === kind)} zone={zone} />
+        : rows.filter(r => r.kind === kind).length ? rows.filter(r => r.kind === kind).map(r => <article key={r.id} className="macro-forecast-row">
         <div><a href={r.sourceUrl} target="_blank" rel="noreferrer">{r.source}<ArrowUpRight size={12} /></a><strong>{r.metric.display}</strong></div>
-        <p>来源更新：{r.sourceUpdatedAt}（原文仅提供日期） · 所属期：{r.reference}</p>
+        <p>来源更新：<ForecastDate row={r} zone={zone} /> · 所属期：{r.reference}</p>
         <p>收录：{time(r.retrievedAt, zone)}{r.collectedAfterRelease ? ' · 公布后收录，非当时系统快照' : ''}</p>
         {r.stale && <p className="macro-warning">旧记录：来源检查失败或预测超过有效期，仅供参考。</p>}
       </article>) : <p className="macro-muted">本期暂无已核验的{label}。</p>}
@@ -110,7 +193,7 @@ function EventDetail({ event, zone, updated, onUpdate }) {
     {event.stale && <p className="macro-warning">源站更新失败，当前为缓存数据。请核对抓取时间。</p>}
     <dl className="macro-values">
       <div><dt>前值<Help field="previous" label="前值" /></dt><dd>{value(event.previous)}</dd></div>
-      <div><dt>一致预期<Help field="forecast" label="一致预期" /></dt><dd>{value(event.forecast, '暂无预期')}</dd></div>
+      <div><dt>公开预期参考<Help field="forecast" label="公开预期参考" /></dt><dd>{value(event.forecast, '暂无预期')}</dd></div>
       <div><dt>实际值<Help field="actual" label="实际值" /></dt><dd>{value(event.actual, event.status === 'upcoming' ? '待公布' : '尚未取得')}</dd></div>
     </dl>
     {event.forecastSource && <p className="macro-muted">预期来源：{event.forecastSource}{event.forecastUpdatedAt && ` · 来源更新 ${event.forecastUpdatedAt}`}</p>}
@@ -132,7 +215,7 @@ function EventDetail({ event, zone, updated, onUpdate }) {
   </aside>;
 }
 
-export default function MacroCalendar({ initialTimezone = 'America/New_York', initialEvent = null }) {
+export default function MacroCalendar({ initialTimezone = 'America/New_York', initialEvent = null, preset = null, onClearPreset }) {
   const [zone, setZone] = useState(initialTimezone);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -140,7 +223,9 @@ export default function MacroCalendar({ initialTimezone = 'America/New_York', in
   const [refresh, setRefresh] = useState(0);
   const [group, setGroup] = useState('ALL');
   const [status, setStatus] = useState('ALL');
-  const [range, setRange] = useState({ start: '', end: '' });
+  const [windowStart] = useState(Date.now);
+  const sevenDayMode = preset === '7d';
+  const [range, setRange] = useState(() => sevenDayMode ? {start:dayKey(windowStart,'America/New_York'),end:dayKey(windowStart+7*86400000,'America/New_York')} : {start:'',end:''});
   const [selected, setSelected] = useState(initialEvent);
   const detail = useRef(null);
   useEffect(() => {
@@ -165,7 +250,8 @@ export default function MacroCalendar({ initialTimezone = 'America/New_York', in
     return () => { disposed = true; ac?.abort(); clearInterval(timer); };
   }, [range.start, range.end, refresh]);
   const all = [...(data?.events || []), ...(data?.observations || [])];
-  const filtered = all.filter(e => (group === 'ALL' || e.group === group) && (status === 'ALL' || e.status === status));
+  const scoped = sevenDayMode ? sevenDayEvents(data?.events || [], windowStart) : all;
+  const filtered = scoped.filter(e => (group === 'ALL' || e.group === group) && (status === 'ALL' || e.status === status));
   const chosen = selected || filtered.find(e => e.status === 'upcoming') || filtered.at(-1);
   // Freeze the selected evidence while the user reads or asks questions.
   useEffect(() => { if (!selected && chosen) setSelected(chosen); }, [selected, chosen]);
@@ -177,25 +263,25 @@ export default function MacroCalendar({ initialTimezone = 'America/New_York', in
       <div className="macro-tools"><select aria-label="日历时区" value={zone} onChange={e => setZone(e.target.value)}>{Object.entries(zones).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
         <button className="button" disabled={busy} onClick={() => setRefresh(r => r + 1)}><RefreshCw size={14} className={busy ? 'macro-spin' : ''} />刷新</button></div>
     </div>
-    <div className="macro-source-status"><span className="macro-live-dot" />免费官方数据 <span>·</span> {data?.consensusStatus === 'connected' ? '一致预期已连接' : data?.consensusStatus === 'stale' ? '一致预期使用缓存' : data?.publicForecastStatus?.sources?.some(s => s.status === 'ok') ? '公开预测已接入 · 按事件覆盖' : '公开预测待更新'}
+    <div className="macro-source-status"><span className="macro-live-dot" />免费官方数据 <span>·</span> {data?.consensusStatus === 'connected' ? '公开预期参考已连接' : data?.consensusStatus === 'stale' ? '公开预期参考使用缓存' : data?.publicForecastStatus?.sources?.some(s => s.status === 'ok') ? '公开预测已接入 · 按事件覆盖' : '公开预测待更新'}
       <span className="macro-check-time">{data ? `最近检查 ${time(data.checkedAt, zone)}` : '正在连接发布机构…'}</span></div>
     {data?.publicForecastStatus && <details className="macro-coverage macro-forecast-status"><summary>公开预测每日更新 · 悉尼时间 08:00{data.publicForecastStatus.lastAttemptAt ? ` · 最近检查 ${time(data.publicForecastStatus.lastAttemptAt, zone)}` : ' · 首次更新中'}</summary>
-      <p>后端运行时自动更新；停机后启动补查。仅解析免费公开来源，不调用付费搜索或 AI。</p>
-      {data.publicForecastStatus.sources.map(s => <p key={s.id}><a href={s.url} target="_blank" rel="noreferrer">{s.id === 'scotia' ? 'Scotiabank 公开周报（调查与机构）' : 'Cleveland Fed（模型）'}</a> · {s.status === 'ok' ? `检查成功，${s.count} 条可解析记录` : s.error}</p>)}
+      <p>汇集公开来源，服务恢复后补充检查遗漏更新。请以来源时间和原文为准。</p>
+      {data.publicForecastStatus.sources.map(s => <p key={s.id}><a href={s.url} target="_blank" rel="noreferrer">{s.label || (s.id === 'scotia' ? 'Scotiabank 公开周报（调查与机构）' : 'Cleveland Fed（模型）')}</a> · {s.status === 'ok' ? `检查成功，${s.count} 条可解析记录` : s.error}</p>)}
     </details>}
     {error && <div className="macro-warning" role="alert">{error}{data && ' 当前列表来自上次成功加载，不代表已刷新。'}</div>}
     {data?.warnings.length > 0 && <details className="macro-coverage"><summary>数据覆盖提示 · {data.warnings.length} 项</summary>{data.warnings.map(w => <p key={w}>{w}</p>)}</details>}
     <div className="macro-layout">
       <section className="macro-list panel">
-        <div className="macro-list-heading"><h2>经济发布日历</h2><span>{filtered.length} 项</span></div>
-        <div className="macro-range"><label>从<input type="date" aria-label="起始日期" value={range.start || data?.from || ''} onChange={e => { setRange(r => ({ start: e.target.value, end: r.end || data?.to || '' })); setSelected(null); setData(null); }} /></label>
-          <label>至<input type="date" aria-label="结束日期" value={range.end || data?.to || ''} onChange={e => { setRange(r => ({ start: r.start || data?.from || '', end: e.target.value })); setSelected(null); setData(null); }} /></label>
+        <div className="macro-list-heading"><h2>{sevenDayMode ? "未来 7 天宏观排期" : "经济发布日历"}</h2><span>{sevenDayMode && `${new Set(filtered.map(e=>e.group+"|"+e.releaseAt)).size} 场发布 · `}{filtered.length} 项指标</span></div>
+        <div className="macro-range"><label>从<input type="date" disabled={sevenDayMode} aria-label="起始日期" value={range.start || data?.from || ''} onChange={e => { setRange(r => ({ start: e.target.value, end: r.end || data?.to || '' })); setSelected(null); setData(null); }} /></label>
+          <label>至<input type="date" disabled={sevenDayMode} aria-label="结束日期" value={range.end || data?.to || ''} onChange={e => { setRange(r => ({ start: r.start || data?.from || '', end: e.target.value })); setSelected(null); setData(null); }} /></label>
           <select aria-label="公布状态" value={status} onChange={e => { setStatus(e.target.value); setSelected(null); }}><option value="ALL">全部状态</option><option value="upcoming">待公布</option><option value="released">已取得数据</option><option value="pending">等待核验</option></select></div>
-        <p className="macro-range-note">范围按美东发布日期筛选，最多跨 120 天。无核验日期的最新序列另列。</p>
-        <div className="macro-table-scroll"><table className="macro-table"><thead><tr><th>事件 / 发布时间<Help field="release" label="事件 / 发布时间" /></th><th>前值<Help field="previous" label="前值" /></th><th>预期<Help field="forecast" label="预期" /></th><th>实际<Help field="actual" label="实际" /></th></tr></thead><tbody>
+        <p className="macro-range-note">{sevenDayMode ? <>从 {time(new Date(windowStart).toISOString(), zone)} 起未来七天，仅列已核验排期；同类同时间合并计场次，各项指标仍可分别查看。日期已确认但时刻未知的事件按美东日历日期计入。 <button className="button" onClick={onClearPreset}>查看完整日历</button></> : "范围按美东发布日期筛选，最多跨 120 天。无核验日期的最新序列另列。"}</p>
+        <div className="macro-table-scroll"><table className="macro-table"><thead><tr><th>事件 / 发布时间<Help field="release" label="事件 / 发布时间" /></th><th>前值<Help field="previous" label="前值" /></th><th>公开预期参考<Help field="forecast" label="公开预期参考" /></th><th>实际<Help field="actual" label="实际" /></th></tr></thead><tbody>
           {filtered.map(e => <tr key={e.id} className={chosen?.id === e.id ? 'selected' : ''}>
             <td><button className="macro-event-button" onClick={() => pick(e)} aria-pressed={chosen?.id === e.id}><span className="macro-row-kind">{e.group} <em>{states[e.status]}{e.stale ? ' · 缓存' : ''}</em></span><strong>{e.title}</strong><small>{releaseTime(e, zone)}</small></button><div className="macro-row-period">所属期<Help field="period" label="统计所属期" /> · {e.reference || '未提供'}</div></td>
-            <td data-label="前值">{value(e.previous, '—')}</td><td data-label="预期">{value(e.forecast, '—')}</td><td data-label="实际" className={e.actual ? 'macro-actual' : 'macro-muted'}>{value(e.actual, e.status === 'upcoming' ? '待公布' : '未取得')}</td>
+            <td data-label="前值">{value(e.previous, '—')}</td><td data-label="公开预期参考">{value(e.forecast, '—')}</td><td data-label="实际" className={e.actual ? 'macro-actual' : 'macro-muted'}>{value(e.actual, e.status === 'upcoming' ? '待公布' : '未取得')}</td>
           </tr>)}
         </tbody></table></div>
         {!filtered.length && <div className="macro-empty"><Clock3 size={26} /><h3>{busy ? '正在读取官方数据…' : '当前范围没有可用事件'}</h3><p>可以切换事件类型或日期范围；缺失数据不会用演示值补齐。</p></div>}

@@ -116,6 +116,6 @@ def test_daily_idempotency_restart_failure_retains_records(monkeypatch):
         await asyncio.gather(p.update(),p.update())
         return await p.update()
     result=asyncio.run(run())
-    assert len(calls)==2 and len(result['records'])==9
+    assert len(calls)==4 and len(result['records'])==9
     assert all(s['status']=='error' for s in result['sources'])
     assert p.read()['scheduleDay']==p.schedule_day(macro.now())

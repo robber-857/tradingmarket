@@ -5,6 +5,7 @@ from io import BytesIO
 import json
 import logging
 import re
+from statistics import median
 from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 
@@ -13,12 +14,17 @@ from bs4 import BeautifulSoup
 from pypdf import PdfReader
 
 from . import macro
+from . import institution_forecasts
 
 STORE = macro.ROOT / 'server/cache/public-forecasts.json'
 LOCK = asyncio.Lock()
 SYDNEY = ZoneInfo('Australia/Sydney')
 SCOTIA = 'https://www.scotiabank.com/ca/en/about/economics/economics-publications.global-week-ahead.html'
 CLEVELAND = 'https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting'
+SOURCES = [('cleveland', CLEVELAND, 'Cleveland Fed（模型）'),
+           ('scotia', SCOTIA, 'Scotiabank 公开周报（调查与机构）'),
+           ('rbc', institution_forecasts.RBC, 'RBC Economics（机构）'),
+           ('usbank', institution_forecasts.USBANK, 'U.S. Bank（机构）')]
 MONTHS = {name: n for n, name in enumerate(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], 1)}
 # Full labels are deliberate: do not confuse index levels, nominal spending or private payrolls.
 SCOTIA_LABELS = {
@@ -37,7 +43,7 @@ EVENT_LABELS = {
 }
 
 
-def record(code, period, raw, kind, source, url, updated, retrieved, release_date=None):
+def record(code, period, raw, kind, source, url, updated, retrieved, release_date=None, *, source_id=None):
     if not re.fullmatch(r'[+-]?\d+(?:\.\d+)?', raw):
         return None
     numeric = float(raw) * (1000 if code == 'nfp' else 1)
@@ -46,7 +52,7 @@ def record(code, period, raw, kind, source, url, updated, retrieved, release_dat
     item = {'indicator': code, 'reference': period, 'kind': kind, 'source': source,
             'sourceUrl': url, 'sourceUpdatedAt': updated, 'retrievedAt': retrieved,
             'releaseDate': release_date, 'metric': macro.metric(str(numeric), '人' if code == 'nfp' else '%'),
-            'sourceId': 'cleveland' if kind == 'model' else 'scotia'}
+            'sourceId': source_id or ('cleveland' if kind == 'model' else 'scotia')}
     item['id'] = macro.digest([code, period, kind, source, url, updated, numeric])
     return item
 
@@ -143,7 +149,7 @@ def schedule_day(at):
 
 async def fetch(client, url, pdf=False):
     # Only links discovered on these public source pages; no arbitrary user URLs.
-    if urlparse(url).hostname not in ('www.scotiabank.com', 'www.clevelandfed.org') or not url.startswith('https://'):
+    if urlparse(url).hostname not in ('www.scotiabank.com', 'www.clevelandfed.org', 'www.rbc.com', 'www.usbank.com') or not url.startswith('https://'):
         raise ValueError('Unexpected source host')
     response = await client.get(url)
     response.raise_for_status()
@@ -182,29 +188,40 @@ async def update():
         data = read()
         at = macro.now()
         day = schedule_day(at)
-        if data['scheduleDay'] == day:
+        # A newly enabled adapter receives one initial check, without re-fetching existing sources.
+        known = {s['id'] for s in data['sources']}
+        versions = {s['id']: s.get('extractionVersion') for s in data['sources']}
+        pending = [s for s in SOURCES if data['scheduleDay'] != day or s[0] not in known
+                   or (s[0] in ('rbc', 'usbank') and versions.get(s[0]) != institution_forecasts.EXTRACTION_VERSION)]
+        if not pending:
             return data
         stamp = macro.iso(at)
         # Persist attempt before I/O so restart cannot create a request loop.
         data.update(scheduleDay=day, lastAttemptAt=stamp)
         write(data)
-        statuses = []
+        pending_ids = {s[0] for s in pending}
+        statuses = [s for s in data['sources'] if s['id'] not in pending_ids]
         rows = {r['id']: r for r in data['records']}
         async with httpx.AsyncClient(timeout=25, follow_redirects=False) as client:
-            for name, source_url in [('cleveland', CLEVELAND), ('scotia', SCOTIA)]:
+            for name, source_url, label in pending:
                 try:
-                    fresh = (parse_cleveland(await fetch(client, CLEVELAND), stamp) if name == 'cleveland'
-                             else await scotia(client, stamp, data['records']))
+                    if name == 'cleveland':
+                        fresh = parse_cleveland(await fetch(client, CLEVELAND), stamp)
+                    elif name == 'scotia':
+                        fresh = await scotia(client, stamp, data['records'])
+                    else:
+                        fresh = await institution_forecasts.collect(name, client, stamp)
                     for r in fresh:
                         # Retain first collection time for point-in-time provenance.
                         if r['id'] not in rows:
                             rows[r['id']] = r
-                    statuses.append({'id': name, 'url': source_url, 'status': 'ok', 'checkedAt': stamp,
-                                     'count': len(fresh), 'error': None})
+                    statuses.append({'id': name, 'label': label, 'url': source_url, 'status': 'ok', 'checkedAt': stamp,
+                                     'count': len(fresh), 'error': None, 'extractionVersion': institution_forecasts.EXTRACTION_VERSION})
                 except Exception as exc:
                     logging.getLogger(__name__).warning('Public forecast source %s failed: %s', name, type(exc).__name__)
-                    statuses.append({'id': name, 'url': source_url, 'status': 'error', 'checkedAt': stamp,
-                                     'count': 0, 'error': '公开来源暂不可用或格式变更，保留旧记录并标注状态。'})
+                    statuses.append({'id': name, 'label': label, 'url': source_url, 'status': 'error', 'checkedAt': stamp,
+                                     'count': 0, 'extractionVersion': institution_forecasts.EXTRACTION_VERSION,
+                                     'error': '公开来源暂不可用或格式变更，保留旧记录并标注状态。'})
         cutoff = (at.date()-timedelta(days=400)).isoformat()
         data.update(records=[r for r in rows.values() if r['sourceUpdatedAt'] >= cutoff], sources=statuses)
         write(data)
@@ -227,8 +244,12 @@ def attach(events, data):
                 continue
             # Do not attach forecasts published after the event, even if the month matches.
             release = macro.timestamp(e['releaseAt']) if e.get('releaseAt') else None
-            if release and r['sourceUpdatedAt'] >= release.astimezone(macro.ET).date().isoformat():
-                continue  # date-only update cannot prove it preceded a same-day release
+            if release:
+                if r.get('sourceUpdatedTimestamp'):
+                    if macro.timestamp(r['sourceUpdatedTimestamp']) >= release:
+                        continue
+                elif r['sourceUpdatedAt'] >= release.astimezone(macro.ET).date().isoformat():
+                    continue  # date-only update cannot prove it preceded a same-day release
             identity = (r['kind'], r['source'])
             if identity not in latest or (r['sourceUpdatedAt'], r['retrievedAt']) > (latest[identity]['sourceUpdatedAt'], latest[identity]['retrievedAt']):
                 latest[identity] = r
@@ -246,6 +267,29 @@ def attach(events, data):
             e.update(forecast=selected['metric'], forecastSource=selected['source'],
                      forecastSourceUrl=selected['sourceUrl'], forecastUpdatedAt=selected['sourceUpdatedAt'])
             e['forecastCollectedAfterRelease'] = selected['collectedAfterRelease']
+        e['institutionComparison'] = compare_institutions(e['publicForecasts'])
+
+
+def compare_institutions(rows):
+    # Never count a market survey, model, stale quote or repeated article as another bank.
+    banks = {}
+    for row in rows:
+        if row['kind'] != 'institution' or row.get('stale') or row['metric']['value'] is None:
+            continue
+        identity = row['sourceId']
+        if identity not in banks or (row['sourceUpdatedAt'], row['retrievedAt']) > (banks[identity]['sourceUpdatedAt'], banks[identity]['retrievedAt']):
+            banks[identity] = row
+    items = list(banks.values())
+    if len(items) < 2 or len({r['metric']['unit'] for r in items}) != 1 or len({(r['indicator'],r['reference']) for r in items}) != 1:
+        return None
+    values = sorted(r['metric']['value'] for r in items)
+    unit = items[0]['metric']['unit']
+    return {'count': len(items), 'min': macro.metric(str(values[0]), unit),
+            'max': macro.metric(str(values[-1]), unit), 'median': macro.metric(str(median(values)), unit),
+            'spread': {'value': round(values[-1]-values[0], 8), 'unit': '百分点' if unit == '%' else '人'},
+            'earliestUpdate': min(r['sourceUpdatedAt'] for r in items),
+            'latestUpdate': max(r['sourceUpdatedAt'] for r in items),
+            'recordIds': [r['id'] for r in items]}
 
 
 def status(data):

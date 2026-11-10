@@ -38,7 +38,6 @@ import {
   Sun,
   Moon,
   TrendingUp,
-  Users,
   X,
   Zap,
 } from "lucide-react";
@@ -46,7 +45,6 @@ import {
   assets,
   events,
   news,
-  views,
   initialCourses,
   lessonText,
 } from "./data";
@@ -59,7 +57,6 @@ const navGroups = [
       ["news", "市场热点", Zap],
       ["daily", "每日市场简报", FileChartColumn],
       ["calendar", "宏观与事件", CalendarDays],
-      ["opinions", "多方观点", Users],
       ["sentiment", "市场情绪", Activity],
     ],
   },
@@ -84,7 +81,6 @@ const descriptions = {
   options: "从真实期权链理解持仓分布、波动成本与财报预期。",
   strategies: "连接真实期权链，比较策略盈亏、组合敏感度与风险。",
   calendar: "提前了解关键数据，用事实校准市场预期。",
-  opinions: "把不同判断放在一起，理解共识，也看见分歧。",
   sentiment: "观察讨论的变化，让情绪成为研究的一个维度。",
   financials: "从三张报表出发，理解公司的经营质量。",
   fundamentals: "理解资产价值的驱动因素与关键风险。",
@@ -294,12 +290,14 @@ export default function App() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "darkness" ? "#212121" : "#ffffff");
     try { localStorage.setItem("meridian-theme", theme); } catch { /* Theme still works without storage. */ }
   }, [theme]);
-  const [page, setPage] = useState(() => location.hash.slice(1) || "overview");
+  const routePage = () => { const name=location.hash.slice(1).split("?")[0] || "overview"; return name === "opinions" ? "calendar" : name; };
+  const [page, setPage] = useState(routePage);
   const [mobile, setMobile] = useState(false);
   const [optionSeed,setOptionSeed]=useState(null);
   const [strategySeed,setStrategySeed]=useState(null);
   const [homeNewsSeed,setHomeNewsSeed]=useState(null);
   const [homeEventSeed,setHomeEventSeed]=useState(null);
+  const [calendarPreset,setCalendarPreset]=useState(() => new URLSearchParams(location.hash.split("?")[1]).get("range"));
   const [homeBriefDay,setHomeBriefDay]=useState('');
   const [market, setMarket] = useState("全部市场");
   const [period, setPeriod] = useState("1周");
@@ -359,7 +357,8 @@ export default function App() {
   const modalRef = useRef(null);
   const toastTimer = useRef(null);
   const navigate = (p) => {
-    setPage(p);
+    setPage(p.split("?")[0]);
+    setCalendarPreset(new URLSearchParams(p.split("?")[1]).get("range"));
     location.hash = p;
     setMobile(false);
     setSearchOpen(false);
@@ -371,7 +370,8 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(""), 3200);
   };
   useEffect(() => {
-    const handler = () => setPage(location.hash.slice(1) || "overview");
+    if (location.hash === "#opinions") history.replaceState(null, "", "#calendar");
+    const handler = () => { if (location.hash === "#opinions") history.replaceState(null, "", "#calendar"); setPage(routePage()); setCalendarPreset(new URLSearchParams(location.hash.split("?")[1]).get("range")); };
     window.addEventListener("hashchange", handler);
     return () => window.removeEventListener("hashchange", handler);
   }, []);
@@ -581,46 +581,10 @@ export default function App() {
       </div>
     );
   }
-  function ViewRows() {
-    return (
-      <div className="views-list">
-        {views.map((v) => (
-          <div className="view-row" key={v.name}>
-            <div className="view-who">
-              <span className="avatar" style={{ background: v.color }}>
-                {v.initial}
-              </span>
-              <div>
-                <strong>{v.name}</strong>
-                <span>{v.role}</span>
-              </div>
-            </div>
-            <div className="view-opinion">
-              <Badge tone="green">{v.stance}</Badge>
-              <p>{v.text}</p>
-            </div>
-            <div className="view-bar">
-              <div className="stacked">
-                <i style={{ width: `${v.bull}%` }} />
-                <i style={{ width: `${v.neutral}%` }} />
-                <i style={{ width: `${v.bear}%` }} />
-              </div>
-              <span>
-                看多 {v.bull}%{" "}
-                <span>
-                  中性 {v.neutral}% · 看空 {v.bear}%
-                </span>
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
   function renderOverview() {
     return <HomeOverview timezone={settings.timezone} watch={watch} onNavigate={navigate}
       onNews={(article,snapshot,category='all')=>{setHomeNewsSeed({article,snapshot,category});navigate('news');}}
-      onEvent={event=>{setHomeEventSeed(event);navigate('calendar');}}
+      onEvent={(event,preset)=>{setHomeEventSeed(event);navigate(preset==='7d'?'calendar?range=7d':'calendar');}}
       onBrief={day=>{setHomeBriefDay(day);navigate('daily');}}
       onResearch={(symbol,dest)=>{setAsset(symbol);if(dest==='options')setOptionSeed({symbol});navigate(dest);}} />;
   }
@@ -650,48 +614,7 @@ export default function App() {
     return <NewsWorkspace timezone={settings.timezone} initialSelection={homeNewsSeed} />;
   }
   function renderCalendar() {
-    return <MacroCalendar initialTimezone={settings.timezone} initialEvent={homeEventSeed} />;
-  }
-  function renderOpinions() {
-    return (
-      <>
-        <div className="notice">
-          <Users size={18} />
-          <div>
-            <b>观点分布，不是价格预测</b>
-            <p>
-              以下为虚构样本。百分比展示观点分类占比；真实版本需显示样本数量、采样时间和分类方法。
-            </p>
-          </div>
-        </div>
-        <section className="panel">
-          <PanelTitle
-            title="市场方向 · 多方观点对比"
-            sub="观察主题：增长、通胀与货币政策 · 演示窗口：最近 7 天"
-          />
-          <ViewRows />
-        </section>
-        <div className="scenario-grid opinion-scenarios">
-          {[
-            ["共识所在", "通胀走势与盈利兑现，是下一阶段需要共同验证的变量。"],
-            [
-              "分歧所在",
-              "市场对政策节奏和增长韧性的判断不同，同一数据可能产生不同解读。",
-            ],
-            [
-              "如何验证",
-              "持续记录观点的条件与失效点，回看原始数据，不按头衔替代证据。",
-            ],
-          ].map(([t, d], i) => (
-            <article key={t}>
-              <span>0{i + 1}</span>
-              <h3>{t}</h3>
-              <p>{d}</p>
-            </article>
-          ))}
-        </div>
-      </>
-    );
+    return <MacroCalendar key={calendarPreset || "all"} initialTimezone={settings.timezone} initialEvent={calendarPreset ? null : homeEventSeed} preset={calendarPreset} onClearPreset={()=>{setHomeEventSeed(null);navigate("calendar");}} />;
   }
   function renderSentiment() {
     const posts = [
@@ -1102,7 +1025,6 @@ export default function App() {
     options: () => <OptionsWorkspace seed={optionSeed} onStrategies={seed => {setStrategySeed(seed);navigate('strategies');}} />,
     strategies: () => <OptionStrategies seed={strategySeed} onOptions={seed => {setOptionSeed(seed);navigate('options');}} />,
     calendar: renderCalendar,
-    opinions: renderOpinions,
     sentiment: renderSentiment,
     watchlist: renderWatchlist,
     academy: renderAcademy,
@@ -1280,7 +1202,7 @@ export default function App() {
             <span>
               <BrandMark className="footer-mark" /> 霁明 Clarora
             </span>
-            <p><span className="brand-motto">化繁为简，见微知明</span><br />研究内容显示来源、时间与口径 · 多方观点、独立情绪页仍为演示</p>
+            <p><span className="brand-motto">化繁为简，见微知明</span><br />研究内容显示来源、时间与口径 · 机构公开观点已并入宏观事件 · 独立情绪页仍为演示</p>
             <button onClick={() => setModal({ type: "method" })}>
               数据与方法
               <ArrowUpRight size={12} />

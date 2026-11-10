@@ -1,3 +1,4 @@
+from . import institution_translation
 import json
 import asyncio
 from contextlib import asynccontextmanager, suppress
@@ -110,6 +111,14 @@ async def macro_calendar(start:date | None=None, end:date | None=None):
     try:
         return await macro.calendar(start, end)
     except macro.MacroError as exc:
+        raise HTTPException(exc.status, exc.message) from exc
+
+
+@app.post('/api/macro/institution-translation')
+async def macro_institution_translation(request: institution_translation.Request):
+    try:
+        return await institution_translation.translate(request)
+    except (macro.MacroError, narrative.AIError) as exc:
         raise HTTPException(exc.status, exc.message) from exc
 
 
