@@ -15,7 +15,7 @@ async function jsonRequest(url, options = {}) {
   try {
     body = await response.json();
   } catch {
-    throw new Error("研究后端尚未启动，请运行 npm run api。");
+    throw new Error("研究服务暂时无法连接，请稍后重试。");
   }
   if (!response.ok) {
     const error = new Error(
@@ -257,13 +257,13 @@ export default function AIResearch({
         </div>
         <div className="ai-actions">
           <span className="badge">
-            {config?.configured ? `${config.model} · 已配置` : "等待配置"}
+            {config?.configured ? "AI 解读已就绪" : "AI 解读暂不可用"}
           </span>
           <button
             className="icon-button"
             onClick={check}
             disabled={checking}
-            aria-label="检查 AI 配置"
+            aria-label="检查 AI 服务状态"
           >
             <RefreshCw size={15} />
           </button>
@@ -290,10 +290,9 @@ export default function AIResearch({
       </div>
       {!config?.configured && (
         <div className="ai-setup">
-          <strong>配置后即可解读当前财报</strong>
+          <strong>AI 解读暂不可用</strong>
           <p>
-            在项目根目录 <code>.env</code> 填写 <code>OPENAI_API_KEY</code>
-            ，保存后点击右上角检查配置。密钥只在后端使用。
+            你仍可查看财报数据与计算结果。请稍后重试，或联系服务支持。
           </p>
         </div>
       )}
@@ -418,7 +417,7 @@ export default function AIResearch({
       </form>
       <p className="ai-note">
         只在点击后调用
-        OpenAI；会发送当前财报指标、假设与问题。切换公司、季度或假设会重置会话。引用与数值经过代码校验，AI
+        OpenAI；会发送当前财报指标、假设与问题。切换公司、季度或假设会重置会话。引用与数值经过校验，AI
         推论仍需复核。
       </p>
     </section>

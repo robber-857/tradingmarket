@@ -78,7 +78,7 @@ async def fetch(key, path, params, ttl):
         if failure and news.date_time(failure['retryAt']) > news.now():
             raise news.NewsError(503, 'Nasdaq 来源正在冷却重试，请稍后再试；未用样本替代')
         try:
-            async with httpx.AsyncClient(timeout=25, headers={'User-Agent':'MeridianResearch/0.4 (local research)', 'Accept':'application/json'}) as client:
+            async with httpx.AsyncClient(timeout=25, headers={'User-Agent':'ClaroraResearch/0.4 (local research)', 'Accept':'application/json'}) as client:
                 async with client.stream('GET', 'https://api.nasdaq.com/api/'+path, params=params) as response:
                     response.raise_for_status()
                     chunks = bytearray()

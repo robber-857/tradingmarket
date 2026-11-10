@@ -121,7 +121,7 @@ async function getJSON(url, options = {}) {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("研究后端尚未启动。请在项目中运行 npm run api。");
+    throw new Error("研究服务暂时无法连接，请稍后重试。");
   }
   if (!r.ok) throw new Error(errorText(data));
   return data;

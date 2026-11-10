@@ -3797,3 +3797,12 @@ footer button {
     font-size: 10px;
   }
 }
+
+/* Clarora: restrained wordmark and shared dawn symbol. */
+.sidebar .brand .brand-wordmark { font-size: 27px; letter-spacing: .16em; font-weight: 600; }
+.sidebar .brand .brand-wordmark > span { font-size: 9px; letter-spacing: .12em; white-space: nowrap; }
+.sidebar .brand > svg { flex-shrink: 0; color: var(--text); }
+.workspace-icon > svg { width: 25px; height: 25px; }
+footer .footer-mark { width: 26px; height: 26px; flex-shrink: 0; }
+footer .brand-motto { color: var(--text); letter-spacing: .08em; line-height: 2; }
+.brand-story-motto { font-weight: 600; }

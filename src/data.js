@@ -211,7 +211,7 @@ export const news = [
     summary:
       "本周的关注点：核心服务通胀能否延续降温，以及就业韧性是否改变政策预期。",
     time: "08:42",
-    source: "观澜研究 · 场景演示",
+    source: "霁明研究 · 场景演示",
     read: "3 分钟",
     impact: "影响：美股 / 美债",
     type: "宏观",
@@ -224,7 +224,7 @@ export const news = [
     summary:
       "把交易所资金流、现货基金流量与衍生品杠杆放在同一框架下，区分需求与短期噪声。",
     time: "08:15",
-    source: "观澜研究 · 场景演示",
+    source: "霁明研究 · 场景演示",
     read: "5 分钟",
     impact: "影响：BTC / ETH",
     type: "加密",
@@ -237,7 +237,7 @@ export const news = [
     summary:
       "从订单增长到自由现金流，梳理科技公司财报中值得持续追踪的三个线索。",
     time: "07:36",
-    source: "观澜研究 · 场景演示",
+    source: "霁明研究 · 场景演示",
     read: "4 分钟",
     impact: "影响：NVDA / MSFT",
     type: "美股",
@@ -246,7 +246,7 @@ export const news = [
 ];
 export const views = [
   {
-    name: "观澜研究团队",
+    name: "霁明研究团队",
     initial: "M",
     role: "多资产研究",
     stance: "谨慎乐观",

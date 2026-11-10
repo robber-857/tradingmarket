@@ -30,7 +30,7 @@ export default function StockSearch({symbol, onSelect}) {
         const data=await r.json();
         if(!r.ok)throw new Error(typeof data.detail==="string"?data.detail:"股票目录暂不可用。");
         if(!c.signal.aborted){setResults(data.results);setMeta(data);}
-      } catch(e){if(!c.signal.aborted)setError(e instanceof SyntaxError?"请启动研究后端后重试。":e.message);}
+      } catch(e){if(!c.signal.aborted)setError(e instanceof SyntaxError?"搜索服务暂时无法连接，请稍后重试。":e.message);}
       finally {if(!c.signal.aborted)setBusy(false);}
     },250);
     return()=>{clearTimeout(timer);c.abort();};

@@ -20,7 +20,7 @@ export function useMarket(report, enabled) {
         return body;
       })
       .then((body) => { if (!controller.signal.aborted) setData(body); })
-      .catch((e) => { if (!controller.signal.aborted) setError(e instanceof SyntaxError ? "请启动研究后端，再刷新行情。" : e.message); })
+      .catch((e) => { if (!controller.signal.aborted) setError(e instanceof SyntaxError ? "行情服务暂时无法连接，请稍后刷新。" : e.message); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [report.symbol, report.snapshotId, enabled, revision]);

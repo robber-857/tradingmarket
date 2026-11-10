@@ -4,6 +4,7 @@ import MacroCalendar from "./MacroCalendar";
 import NewsWorkspace from "./NewsWorkspace";
 import DailyBrief from "./DailyBrief";
 import HomeOverview from "./HomeOverview";
+import BrandMark from "./BrandMark";
 import OptionsWorkspace from "./OptionsWorkspace";
 import OptionStrategies from "./OptionStrategies";
 import {
@@ -358,7 +359,8 @@ export default function App() {
   const modalRef = useRef(null);
   const toastTimer = useRef(null);
   const navigate = (p) => {
-    setPage(p);
+    setPage(p.split("?")[0]);
+    setCalendarPreset(new URLSearchParams(p.split("?")[1]).get("range"));
     location.hash = p;
     setMobile(false);
     setSearchOpen(false);
@@ -370,7 +372,7 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(""), 3200);
   };
   useEffect(() => {
-    const handler = () => setPage(location.hash.slice(1) || "overview");
+    const handler = () => { setPage(location.hash.slice(1).split("?")[0] || "overview"); setCalendarPreset(new URLSearchParams(location.hash.split("?")[1]).get("range")); };
     window.addEventListener("hashchange", handler);
     return () => window.removeEventListener("hashchange", handler);
   }, []);
@@ -434,18 +436,18 @@ export default function App() {
     );
     notify(
       reminders.includes(id)
-        ? "已取消本地提醒标记"
-        : "已加入本地提醒清单；尚未开启推送",
+        ? "已取消提醒标记"
+        : "已加入提醒清单；暂不发送推送通知",
     );
   };
   const exportBrief = () => {
-    const text = `Meridian 观澜｜市场研究演示简报\n2026-11-08｜全部为模拟数据，不是实时行情或投资建议\n\n市场观察：关注通胀数据、就业变化与企业盈利。\n\n我的关注：${watch.join("、")}\n\n关键事件（演示排期）：\n${events.map((e) => `${e.title}：预期 ${e.forecast}，前值 ${e.previous}，公布值 ${e.actual}`).join("\n")}\n\n观点占比为虚构样本分布，不代表上涨概率。`;
+    const text = `霁明 Clarora｜市场研究演示简报\n2026-11-08｜全部为模拟数据，不是实时行情或投资建议\n\n市场观察：关注通胀数据、就业变化与企业盈利。\n\n我的关注：${watch.join("、")}\n\n关键事件（演示排期）：\n${events.map((e) => `${e.title}：预期 ${e.forecast}，前值 ${e.previous}，公布值 ${e.actual}`).join("\n")}\n\n观点占比为虚构样本分布，不代表上涨概率。`;
     const u = URL.createObjectURL(
       new Blob(["\uFEFF" + text], { type: "text/plain;charset=utf-8" }),
     );
     const link = document.createElement("a");
     link.href = u;
-    link.download = "Meridian-研究演示简报.txt";
+    link.download = "Clarora-研究演示简报.txt";
     link.click();
     URL.revokeObjectURL(u);
     notify("演示简报已导出");
@@ -939,7 +941,7 @@ export default function App() {
       <>
         <section className="academy-banner">
           <div>
-            <span className="eyebrow">MERIDIAN ACADEMY</span>
+            <span className="eyebrow">CLARORA ACADEMY</span>
             <h2>建立框架，让信息成为认知。</h2>
             <p>从宏观到基本面，用系统的方法理解市场。</p>
             <button
@@ -1023,7 +1025,7 @@ export default function App() {
           </div>
         )}
         <p className="fine-print academy-note">
-          课程为本地文字样课；发布内容仅保存到当前浏览器，不会发布到互联网。
+          当前提供文字示例课程；你创建的课程仅自己可见，尚未公开发布。
         </p>
       </>
     );
@@ -1116,26 +1118,18 @@ export default function App() {
         <button
           className="brand"
           onClick={() => navigate("overview")}
-          aria-label="Meridian 观澜首页"
+          aria-label="霁明 Clarora首页"
         >
-          <svg viewBox="0 0 40 40" aria-hidden="true">
-            <path
-              d="M7 29V11l13 15 13-15v18M7 21l13-13 13 13"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.6"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span>
-            meridian<span>观澜 · 市场研究</span>
+          <BrandMark />
+          <span className="brand-wordmark">
+            霁明<span>CLARORA · 市场研究</span>
           </span>
         </button>
         <button
           className="workspace-picker"
           onClick={() => setModal({ type: "workspace" })}
         >
-          <span className="workspace-icon">M</span>
+          <span className="workspace-icon"><BrandMark /></span>
           <span>
             个人研究空间<small>Personal workspace</small>
           </span>
@@ -1169,7 +1163,7 @@ export default function App() {
               <Sparkles size={17} />
               <span>更完整的市场视野</span>
             </div>
-            <p>探索 Meridian Pro 研究空间</p>
+            <p>探索 Clarora Pro 研究空间</p>
             <button onClick={() => setModal({ type: "plan" })}>
               了解订阅计划
               <ArrowUpRight size={15} />
@@ -1188,7 +1182,7 @@ export default function App() {
           >
             <span className="avatar profile-avatar">L</span>
             <span>
-              研究员<small>本地演示账户</small>
+              研究员<small>体验账户</small>
             </span>
             <ChevronsUpDown size={15} />
           </button>
@@ -1242,7 +1236,7 @@ export default function App() {
             </button>
             <button
               className="top-avatar"
-              aria-label="查看演示账户"
+              aria-label="查看研究空间"
               onClick={() => setModal({ type: "workspace" })}
             >
               L
@@ -1252,7 +1246,7 @@ export default function App() {
         <main>
           <div className="page-heading">
             <div>
-              <div className="page-eyebrow">YOUR MARKET, IN PERSPECTIVE</div>
+              <div className="page-eyebrow">{page === "overview" ? "化繁为简，见微知明" : "CLARORA · MARKET RESEARCH"}</div>
               <h1>
                 {titles[page] || "偏好与数据源"}
                 {page === "overview" && <span className="heading-dot" />}
@@ -1285,9 +1279,9 @@ export default function App() {
           </div>
           <footer>
             <span>
-              <span className="footer-mark">m</span> Meridian 观澜
+              <BrandMark className="footer-mark" /> 霁明 Clarora
             </span>
-            <p>研究内容显示来源、时间与口径 · 多方观点、独立情绪页仍为演示</p>
+            <p><span className="brand-motto">化繁为简，见微知明</span><br />研究内容显示来源、时间与口径 · 多方观点、独立情绪页仍为演示</p>
             <button onClick={() => setModal({ type: "method" })}>
               数据与方法
               <ArrowUpRight size={12} />
@@ -1587,7 +1581,7 @@ export default function App() {
       case "notifications":
         return (
           <>
-            <Badge>本地清单</Badge>
+            <Badge>提醒清单</Badge>
             <h2>我的事件提醒</h2>
             <p>提醒标记保存在当前浏览器。尚未接入后台调度、邮件或系统推送。</p>
             {reminders.length ? (
@@ -1678,7 +1672,7 @@ export default function App() {
       case "publish":
         return (
           <>
-            <Badge>创作者工作台 · 本地演示</Badge>
+            <Badge>创作者工作台 · 体验版</Badge>
             <h2>发布知识内容</h2>
             <p>
               内容只保存在此浏览器，刷新后可继续查看。正式发布需要后台账户与权限。
@@ -1715,7 +1709,7 @@ export default function App() {
                 });
                 setCourseFilter("全部课程");
                 setModal(null);
-                notify("已保存到本地交易学院");
+                notify("课程已保存，仅自己可见");
               }}
             >
               <label>
@@ -1767,7 +1761,7 @@ export default function App() {
                 />
               </label>
               <button className="button primary" type="submit">
-                保存到本地学院
+                保存课程
                 <ArrowRight size={15} />
               </button>
             </form>
@@ -1779,33 +1773,25 @@ export default function App() {
             <Badge>产品说明</Badge>
             <h2>数据与研究方法</h2>
             <div className="prose">
-              <h3>当前版本</h3>
-              <p>
-                财报分析与基本面分析已连接 SEC 官方披露，支持
-                SEC 代码目录搜索与上市公司自动识别。
-                财务指标与估值由确定性公式计算，可查看来源和假设。观点与情绪页面仍为演示内容；新闻使用公开 RSS，宏观日历使用官方数据，缺失值明确标注，AI
-                解读与追问已接入 OpenAI，需在后端配置 API Key 后使用。
-              </p>
-              <h3>情绪分析口径</h3>
-              <p>
-                计划按资产、语言和时间窗口筛选授权获取的帖子，去除重复内容，标注看多、中性和看空，并提供人工抽样复核。需要单独处理反讽、转述和混合观点。
-              </p>
-              <h3>百分比的含义</h3>
-              <p>
-                观点占比描述样本中的分类分布，不代表未来上涨概率。后续上线必须显示样本量、来源范围、分类错误率与更新时间。
-              </p>
-              <h3>本地保存</h3>
-              <p>
-                关注资产、事件提醒、文章收藏、课程与监测关键词通过 localStorage
-                保存在当前浏览器，不会在其他设备间同步。
-              </p>
+              <h3>霁明 Clarora</h3>
+              <p className="brand-story-motto">云销雨霁，万象澄明。</p>
+              <p>化繁为简，见微知明。拨云见理，观市有据。</p>
+              <p>品牌名取意于王勃《滕王阁序》“云销雨霁，彩彻区明”，从“雨霁”与“区明”中各取一字。“云销雨霁，万象澄明”为品牌延展文案。</p>
+              <h3>观其变，究其理，明其势。</h3>
+              <p>以 AI 梳理市场信息，串联事件、数据与研究线索，让复杂研究更易理解，帮助你形成自己的判断。</p>
+              <h3>研究有据</h3>
+              <p>财报研究依据 SEC 官方披露，财务指标与估值提供计算口径、来源和假设。新闻与宏观事件保留来源和时间，缺失数据明确标注。AI 辅助解释已有信息，区分事实、推论与条件假设，不代替独立判断。</p>
+              <h3>如何理解观点与情绪</h3>
+              <p>观点与情绪页面目前展示示例内容。观点占比描述样本中的分类分布，不代表未来上涨概率，也不构成买卖建议。</p>
+              <h3>你的研究记录</h3>
+              <p>关注、收藏与学习进度会保留在当前浏览器，暂不支持跨设备同步。清除浏览器数据可能导致这些记录丢失。</p>
             </div>
           </>
         );
       case "plan":
         return (
           <>
-            <Badge tone="green">MERIDIAN PRO · 规划中</Badge>
+            <Badge tone="green">CLARORA PRO · 规划中</Badge>
             <h2>为持续研究，留一个专属空间。</h2>
             <p>
               订阅制产品将由团队为客户开通账户，提供统一的市场研究与学习体验。
@@ -1826,7 +1812,7 @@ export default function App() {
             <div className="notice">
               <CircleHelp size={19} />
               <p>
-                套餐价格、支付与真实账户系统尚未配置；此处不会产生订阅或扣费。
+                订阅服务尚未开放，浏览与体验不会产生扣费。
               </p>
             </div>
             <button
@@ -1846,7 +1832,7 @@ export default function App() {
           <>
             <Badge tone="green">PERSONAL WORKSPACE</Badge>
             <h2>你的个人研究空间</h2>
-            <p>你正在使用 Meridian 观澜本地演示账户。</p>
+            <p>在霁明 Clarora 整理关注、回顾事件，持续积累研究。</p>
             <div className="workspace-stats">
               <div>
                 <strong>{watch.length}</strong>
@@ -1862,8 +1848,7 @@ export default function App() {
               </div>
             </div>
             <p>
-              当前版本无需登录，数据保存在本机浏览器。正式 SaaS
-              版本需要独立账号、订阅权限和团队管理后台。
+              当前为免登录体验。研究记录仅保留在当前浏览器，暂不支持跨设备同步。
             </p>
             <button
               className="button"

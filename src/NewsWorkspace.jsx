@@ -33,7 +33,7 @@ function NewsAnalysis({ snapshot, article, onPin }) {
     <div className="news-section-heading"><Sparkles size={17} /><h3>{article ? 'AI 简洁解读' : '今日市场重点'}</h3></div>
     {!turns.length && <><p>{article ? '简洁总结这则消息，区分来源陈述与市场推论。' : '从最近 24 小时的美股、Crypto 和宏观新闻中选取最多六则，提炼重点与可能影响。'}</p>
       <button className="button primary" disabled={busy} onClick={() => ask()}><Sparkles size={14} />{busy ? '正在分析来源…' : article ? '生成新闻解读' : '生成今日重点'}</button>
-      <small>使用 RSS / 帖文预览，未读取全文。点击后调用 OpenAI。</small></>}
+      <small>使用 RSS / 帖文预览，未读取全文。点击后生成 AI 解读。</small></>}
     <div aria-live="polite">{turns.map((turn, index) => <article className="news-answer" key={index}>
       {index > 0 && <p className="news-question">{turn.question}</p>}
       {[turn.answer.conclusion, ...turn.answer.insights].map((claim, i) => <div className={i === 0 ? 'news-takeaway' : 'news-impact'} key={i}>
@@ -96,7 +96,7 @@ export default function NewsWorkspace({ timezone = 'America/New_York', initialSe
   return <div className="real-news-workspace">
     <div className="real-news-top"><div className="news-mode-tabs" role="group" aria-label="热点来源">{[['news', '市场新闻'], ['reddit', 'Reddit 24 小时'], ['x', 'X 讨论样本']].map(([id, title]) => <button key={id} className={tab === id ? 'active' : ''} aria-pressed={tab === id} onClick={() => changeTab(id)}>{title}</button>)}</div>
       <button className="button" disabled={busy} onClick={() => setRefresh(n => n + 1)}><RefreshCw size={14} className={busy ? 'news-spin' : ''} />刷新来源</button></div>
-    <div className="news-live-status"><span className="news-live-dot" />{sourceList.filter(s => s.available && !s.stale).length}/{sourceList.length} 来源可用 <span>·</span> {data ? `最近检查 ${stamp(data.checkedAt, timezone)}` : '连接免费公开来源…'}<span className="news-status-note">{data?.backgroundEnabled === false ? '后台轮询已关闭' : '后端运行时自动更新'}</span></div>
+    <div className="news-live-status"><span className="news-live-dot" />{sourceList.filter(s => s.available && !s.stale).length}/{sourceList.length} 来源可用 <span>·</span> {data ? `最近检查 ${stamp(data.checkedAt, timezone)}` : '连接免费公开来源…'}<span className="news-status-note">{data?.backgroundEnabled === false ? '自动更新已关闭' : '服务可用时自动更新'}</span></div>
     <div className="real-news-controls"><div className="news-category-tabs" role="group" aria-label="新闻主题">{Object.entries(categories).map(([id, title]) => <button key={id} className={category === id ? 'active' : ''} onClick={() => setCategory(id)}>{title}</button>)}</div>
       <input aria-label="搜索市场新闻" placeholder="搜索公司、资产或关键词…" value={search} onChange={e => setSearch(e.target.value)} />
       {tab === 'news' && <><select aria-label="新闻时间范围" value={hours} disabled={!!day} onChange={e => setHours(Number(e.target.value))}><option value={24}>最近 24 小时</option><option value={168}>最近 7 天</option></select><select aria-label="每日新闻目录" value={day} onChange={e => { setDay(e.target.value); setSelected(null); }}><option value="">实时更新</option>{dates.map(d => <option value={d} key={d}>{d} 目录</option>)}</select></>}
@@ -118,7 +118,7 @@ export default function NewsWorkspace({ timezone = 'America/New_York', initialSe
               {!day && <button onClick={() => choose(item)}><Sparkles size={13} />AI 解读</button>}<a href={item.url} target="_blank" rel="noreferrer">原文<ExternalLink size={11} /></a></div>
           </div>
         </article>)}
-        {!list.length && <div className="news-empty"><Newspaper size={28} /><h3>{busy ? '正在读取来源…' : tab === 'x' ? 'X 数据尚未可用' : day && !archive ? '正在读取当日目录…' : '当前范围没有可用消息'}</h3><p>{tab === 'x' ? '新闻和 Reddit 使用免费 RSS。X 官方访问需另行开通并在后端配置 X_BEARER_TOKEN；当前不展示模拟热榜。' : '调整主题、时间或关键词，也可以展开下方来源状态。'}</p>{tab === 'x' && <a href="https://docs.x.com/x-api/getting-started/pricing" target="_blank" rel="noreferrer">查看 X 官方访问说明<ArrowUpRight size={12} /></a>}</div>}
+        {!list.length && <div className="news-empty"><Newspaper size={28} /><h3>{busy ? '正在读取来源…' : tab === 'x' ? 'X 数据尚未可用' : day && !archive ? '正在读取当日目录…' : '当前范围没有可用消息'}</h3><p>{tab === 'x' ? 'X 内容暂未开放。你可以先查看新闻与 Reddit 来源；这里仅展示已取得的真实内容。' : '调整主题、时间或关键词，也可以展开下方来源状态。'}</p>{tab === 'x' && <a href="https://docs.x.com/x-api/getting-started/pricing" target="_blank" rel="noreferrer">了解 X 数据访问规则<ArrowUpRight size={12} /></a>}</div>}
         <details className="news-source-details"><summary>来源状态与更新时间</summary>{sourceList.map(s => <div key={s.id}><a href={s.url} target="_blank" rel="noreferrer">{s.name}</a><span>{s.error || (s.available ? '已连接' : '不可用')}{s.retrievedAt ? ` · ${stamp(s.retrievedAt, timezone)}` : ''}</span></div>)}</details>
       </section>
       <div ref={detail} className="news-detail-anchor"><aside className="news-detail panel">

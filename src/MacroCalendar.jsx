@@ -203,6 +203,6 @@ export default function MacroCalendar({ initialTimezone = 'America/New_York', in
       </section>
       <div ref={detail}>{chosen ? <EventDetail event={chosen} zone={zone} updated={newest && newest.snapshotId !== chosen.snapshotId} onUpdate={() => setSelected(newest)} /> : <aside className="macro-detail panel"><h3>选择一个事件</h3><p>查看数据、来源和对不同资产的可能影响。</p></aside>}</div>
     </div>
-    <p className="macro-footnote">{data?.notice || '读取官方数据，保留来源与抓取时间。'} AI 分析使用你已配置的 OpenAI，点击生成后才调用。</p>
+    <p className="macro-footnote">{data?.notice || '读取官方数据，保留来源与抓取时间。'} 点击生成 AI 解读，查看事件背景、影响路径与研究依据。</p>
   </div>;
 }
