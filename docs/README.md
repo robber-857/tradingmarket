@@ -25,6 +25,7 @@
 | 首页与自选参考行情 | [行情口径](dashboard-markets.md) |
 | AI 模型、证据与会话 | [AI 配置与实现](ai-research.md) |
 | 宏观和机构预测 | [宏观来源](macro-data.md) · [公开预测](public-forecasts.md) |
+| 名人与机构披露 | [大资金动向](capital-tracking.md) · 13F、个人报告、来源和更新机制 |
 | 新闻、每日简报与期权 | [市场新闻](market-news.md) · [每日简报与期权](daily-brief-options.md) · [真实期权策略](live-option-strategies.md) |
 
 ## 部署与迁移

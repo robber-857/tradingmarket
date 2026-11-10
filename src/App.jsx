@@ -12,6 +12,7 @@ import OptionsWorkspace from "./OptionsWorkspace";
 import OptionStrategies from "./OptionStrategies";
 const Membership = lazy(() => import("./Membership"));
 const Admin = lazy(() => import("./Admin"));
+const CapitalTracking = lazy(() => import("./CapitalTracking"));
 import {memberRequest} from "./member-api";
 import WatchlistSync from "./WatchlistSync";
 import {
@@ -65,6 +66,7 @@ const navGroups = [
       ["daily", "每日市场简报", FileChartColumn],
       ["calendar", "宏观与事件", CalendarDays],
       ["sentiment", "市场情绪", Activity],
+      ["capital", "大资金动向", Globe2],
     ],
   },
   {
@@ -90,6 +92,7 @@ const descriptions = {
   strategies: "连接真实期权链，比较策略盈亏、组合敏感度与风险。",
   calendar: "提前了解关键数据，用事实校准市场预期。",
   sentiment: "观察讨论的变化，让情绪成为研究的一个维度。",
+  capital: "追踪人物与机构的公开披露，分清报告期、交易日与更新日期。",
   financials: "从三张报表出发，理解公司的经营质量。",
   fundamentals: "理解资产价值的驱动因素与关键风险。",
   watchlist: "把你的研究对象，放在同一个视野里。",
@@ -985,6 +988,7 @@ export default function App() {
     strategies: () => <OptionStrategies seed={strategySeed} onOptions={seed => {setOptionSeed(seed);navigate('options');}} />,
     calendar: renderCalendar,
     sentiment: renderSentiment,
+    capital: () => <Suspense fallback={<p role="status">正在打开大资金动向…</p>}><CapitalTracking /></Suspense>,
     watchlist: renderWatchlist,
     academy: renderAcademy,
     admin: () => <Suspense fallback={<p role="status">正在打开管理后台…</p>}><Admin /></Suspense>,
@@ -1153,7 +1157,7 @@ export default function App() {
                 <span className="status-dot" />
                 {["overview", "financials", "fundamentals", "calendar", "news", "daily", "options", "strategies"].includes(page)
                   ? ({overview:"每日关注",calendar:"宏观数据",news:"真实新闻",daily:"AI 每日简报",options:"延迟期权链",strategies:"策略研究"}[page] || "财报研究")
-                  : ({settings:"个人偏好",watchlist:"自选研究",academy:"学习中心",membership:"收费准备",admin:"账号管理"}[page] || "示例内容")}
+                  : ({settings:"个人偏好",watchlist:"自选研究",academy:"学习中心",membership:"收费准备",admin:"账号管理",capital:"公开披露"}[page] || "示例内容")}
               </Badge>
               {page === "sentiment" && (
                 <button className="button" onClick={exportBrief}>

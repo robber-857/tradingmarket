@@ -22,6 +22,7 @@ from . import admin_api
 from . import billing_catalog
 from . import billing
 from . import payment_operations
+from . import capital
 
 
 @asynccontextmanager
@@ -48,6 +49,7 @@ app.include_router(admin_api.router)
 app.include_router(billing_catalog.router)
 app.include_router(billing.router)
 app.include_router(payment_operations.router)
+app.include_router(capital.router)
 app.middleware('http')(member_api.access_middleware)
 app.add_middleware(CORSMiddleware, allow_origins=['http://127.0.0.1:5173','http://localhost:5173','http://127.0.0.1:4173'],
                    allow_methods=['GET','POST','PUT','DELETE'],allow_headers=['Content-Type','Idempotency-Key'])
