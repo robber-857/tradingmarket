@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import ResearchWorkspace from "./ResearchWorkspace";
 import MacroCalendar from "./MacroCalendar";
 import NewsWorkspace from "./NewsWorkspace";
@@ -1147,7 +1148,7 @@ export default function App() {
           {toast}
         </div>
       )}
-      {(modal || searchOpen) && (
+      {(modal || searchOpen) && createPortal(
         <div
           className="modal-overlay"
           onMouseDown={(e) => {
@@ -1284,7 +1285,7 @@ export default function App() {
               renderModal()
             )}
           </section>
-        </div>
+        </div>, document.body
       )}
     </div>
   );

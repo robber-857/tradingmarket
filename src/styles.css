@@ -2115,6 +2115,7 @@ footer button {
   animation: toast-in 0.2s ease;
 }
 .modal-overlay {
+  --dialog-gap: 30px;
   position: fixed;
   inset: 0;
   background: var(--scrim);
@@ -2123,13 +2124,20 @@ footer button {
   align-items: center;
   justify-content: center;
   z-index: 60;
-  padding: 30px;
+  padding: var(--dialog-gap);
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   animation: fade-in 0.16s ease;
 }
 .modal {
   width: 570px;
   max-width: 100%;
-  max-height: 90vh;
+  max-height: calc(100vh - 2 * var(--dialog-gap));
+  max-height: calc(100dvh - 2 * var(--dialog-gap));
+  min-height: 0;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2140,9 +2148,11 @@ footer button {
   animation: modal-in 0.25s ease;
 }
 .modal-close {
-  position: absolute;
-  top: 17px;
-  right: 17px;
+  position: sticky;
+  top: 0;
+  float: right;
+  margin: -17px -17px 0 0;
+  background: var(--surface);
   z-index: 2;
 }
 .modal > .badge {
@@ -2384,17 +2394,17 @@ footer button {
 .search-modal {
   padding: 0;
   width: 650px;
-  align-self: flex-start;
-  margin-top: 9vh;
+  min-height: 0;
 }
 .search-modal .modal-close {
-  display: none;
+  display: inline-flex;
+  margin: 12px 12px 0 0;
 }
 .search-dialog-input {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 22px;
+  padding: 22px 12px 22px 22px;
   border-bottom: 1px solid var(--border);
   color: var(--muted);
 }
@@ -3529,11 +3539,12 @@ footer button {
     font-size: 8px;
   }
   .modal-overlay {
-    padding: 14px;
+    --dialog-gap: 14px;
+    padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   }
   .modal {
     padding: 27px 22px;
-    max-height: 92vh;
+    max-height: calc(100dvh - max(14px, env(safe-area-inset-top)) - max(14px, env(safe-area-inset-bottom)));
     border-radius: 11px;
   }
   .modal h2 {
@@ -3546,8 +3557,8 @@ footer button {
     font-size: 9px;
   }
   .modal-close {
-    top: 12px;
-    right: 10px;
+    top: 0;
+    margin: -15px -12px 0 0;
   }
   .event-values {
     padding: 17px 13px;
@@ -3587,10 +3598,9 @@ footer button {
   }
   .search-modal {
     padding: 0;
-    margin-top: 4vh;
   }
   .search-dialog-input {
-    padding: 22px 17px;
+    padding: 22px 10px 22px 17px;
     gap: 11px;
   }
   .search-dialog-input input {

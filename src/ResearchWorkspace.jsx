@@ -1,5 +1,6 @@
 import {customerMessage} from './customer-message';
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -186,7 +187,7 @@ function Inspector({ item, onClose }) {
     };
   }, [onClose]);
   const d = item.data;
-  return (
+  return createPortal(
     <div
       className="modal-overlay"
       onMouseDown={(e) => {
@@ -253,7 +254,7 @@ function Inspector({ item, onClose }) {
           展示最新可得修订口径，可能来自后续申报。币种为 USD，B 代表十亿美元。
         </p>
       </section>
-    </div>
+    </div>, document.body
   );
 }
 function Trend({ quarters, metric, onSelect }) {

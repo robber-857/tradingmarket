@@ -3,6 +3,10 @@
 .sidebar .brand > .brand-artwork { display:block; width:100%; height:auto; }
 .brand-story-artwork { display:block; width:100%; height:auto; margin:16px 0 24px; padding:12px; background:#f8f8fa; border-radius:10px; }
 .page-content { min-width: 0; }
+/* Keep help readable on short landscape viewports, too. */
+.field-help-popup { max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+.sidebar { overscroll-behavior: contain; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.sidebar > * { flex-shrink: 0; }
 .page-heading { gap: 20px; }
 .page-heading > div:first-child { min-width: 0; }
 .page-heading p { line-height: 1.75; }
