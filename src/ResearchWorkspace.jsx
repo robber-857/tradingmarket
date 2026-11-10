@@ -212,12 +212,12 @@ function Inspector({ item, onClose }) {
         <p>
           {d?.formula ||
             (d?.status === "disclosed"
-              ? "官方 XBRL 披露值"
+              ? "官方财报披露值"
               : d?.reason || "当前无法计算")}
         </p>
         {d?.warning && <div className="r-alert">{d.warning}</div>}
         <h3>原始输入与出处</h3>
-        {d?.sourceUrl && <p><a href={d.sourceUrl} target="_blank" rel="noreferrer">Twelve Data 数据接口与口径 <ExternalLink size={12}/></a>{d.retrievedAt && <small> · 采集于 {d.retrievedAt}</small>}</p>}
+        {d?.sourceUrl && <p><a href={d.sourceUrl} target="_blank" rel="noreferrer">Twelve Data 数据来源与口径 <ExternalLink size={12}/></a>{d.retrievedAt && <small> · 采集于 {d.retrievedAt}</small>}</p>}
         {d?.evidence?.map((e, i) => (
           <article
             className="source-record"
@@ -231,13 +231,12 @@ function Inspector({ item, onClose }) {
               </b>
               <span>{e.unit}</span>
             </div>
-            <code>{e.tag}</code>
             <p>
               {e.start ? `${e.start} → ` : ""}
               {e.end} · {e.form} · {e.filed} 提交
             </p>
             <a href={e.url} target="_blank" rel="noreferrer">
-              {e.accession}
+              查看原始财报
               <ExternalLink size={12} />
             </a>
           </article>
@@ -246,7 +245,7 @@ function Inspector({ item, onClose }) {
           <p>
             {d?.value == null
               ? "没有完整输入时不生成估计值。缺失不等于零。"
-              : "此项来自用户假设或确定性模型，详见估值参数与计算账本；不是官方预测。"}
+              : "此项根据你的假设与估值公式计算，详见估值参数与计算明细；不是官方预测。"}
           </p>
         )}
         <p className="fine-print">
@@ -504,7 +503,7 @@ export default function ResearchWorkspace({
                     <span className="eyebrow">
                       THE THREE THINGS THAT MATTER
                     </span>
-                    <span className="badge">确定性计算 · 非 AI 猜测</span>
+                    <span className="badge">按财报与公式计算</span>
                   </div>
                   <div className="r-insight-grid">
                     {quarter.insights.map((item, i) => (
@@ -636,7 +635,7 @@ export default function ResearchWorkspace({
                 }
               >
                 <Download size={13} />
-                导出证据快照
+                导出研究数据
               </button>
             </div>
           </>
@@ -770,8 +769,8 @@ function MethodPanel({ report }) {
         <h3>事实、解读与假设分开</h3>
         <p>
           财务数字取自正式 10-Q /
-          10-K；增长率和比率由代码计算。置顶三项摘要来自确定性规则；AI 解读区由
-          OpenAI 生成，并区分数据事实、推论和条件假设。均不代表买卖评级。
+          10-K；增长率和比率按下列公式计算。摘要提炼关键财务变化，AI 解读区进一步解释数据，
+          并区分事实、推论和条件假设。均不代表买卖评级。
         </p>
         <h3>使用什么公式？</h3>
         <code>营收同比 = 本季营收 / 上年同季营收 − 1</code>
@@ -787,11 +786,6 @@ function MethodPanel({ report }) {
         {report.limitations.map((t) => (
           <p key={t}>{t}</p>
         ))}
-        <p>
-          计算版本：{report.engineVersion}
-          <br />
-          快照：{report.snapshotId}
-        </p>
         {sources.map(([t, u]) => (
           <a href={u} key={u} target="_blank" rel="noreferrer">
             {t}
@@ -1338,8 +1332,7 @@ function ValuationPanel({ report, quarter, onInspect }) {
             WACC、年末折现。
           </p>
           <p className="r-table-note">
-            {result.roicBasis} 模型版本：{result.base.modelVersion} · 输入快照：
-            {result.snapshotId}
+            {result.roicBasis}
           </p>
         </section>
       )}

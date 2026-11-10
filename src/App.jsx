@@ -284,6 +284,7 @@ function Chart({ period = "1周", market = "全部市场", large = false }) {
 }
 
 export default function App() {
+  const searchShortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme === "darkness" ? "darkness" : "lightness");
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -377,7 +378,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     const handler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setSearchOpen((v) => !v);
       }
@@ -1047,6 +1048,14 @@ export default function App() {
           </span>
         </button>
         <button
+          className="brand-about"
+          onClick={() => { setMobile(false); setModal({ type: "method" }); }}
+        >
+          <CircleHelp size={14} />
+          <span>产品说明</span>
+          <ArrowUpRight size={12} />
+        </button>
+        <button
           className="workspace-picker"
           onClick={() => setModal({ type: "workspace" })}
         >
@@ -1140,11 +1149,12 @@ export default function App() {
             </label>
             <button
               className="global-search"
+              aria-label={`搜索资产、事件、课程（${searchShortcut}）`}
+              title={`打开搜索 · ${searchShortcut}`}
               onClick={() => setSearchOpen(true)}
             >
               <Search size={16} />
               <span>搜索资产、事件、课程...</span>
-              <kbd>⌘ K</kbd>
             </button>
             <span className="topbar-separator" />
             <button
@@ -1204,7 +1214,7 @@ export default function App() {
             </span>
             <p><span className="brand-motto">化繁为简，见微知明</span><br />研究内容显示来源、时间与口径 · 机构公开观点已并入宏观事件 · 独立情绪页仍为演示</p>
             <button onClick={() => setModal({ type: "method" })}>
-              数据与方法
+              产品说明
               <ArrowUpRight size={12} />
             </button>
           </footer>
@@ -1692,7 +1702,7 @@ export default function App() {
         return (
           <>
             <Badge>产品说明</Badge>
-            <h2>数据与研究方法</h2>
+            <h2>产品说明</h2>
             <div className="prose">
               <h3>霁明 Clarora</h3>
               <p className="brand-story-motto">云销雨霁，万象澄明。</p>

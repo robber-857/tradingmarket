@@ -3806,3 +3806,9 @@ footer button {
 footer .footer-mark { width: 26px; height: 26px; flex-shrink: 0; }
 footer .brand-motto { color: var(--text); letter-spacing: .08em; line-height: 2; }
 .brand-story-motto { font-weight: 600; }
+
+/* Keep the product introduction alongside the brand, above scrolling content. */
+.sidebar .brand { padding-bottom: 12px; }
+.brand-about { display: flex; align-items: center; gap: 7px; margin: 0 7px 20px; padding: 5px 0; color: var(--text-secondary, var(--muted)); font-size: 12px; text-align: left; }
+.brand-about:hover { color: var(--text); }
+.brand-about:focus-visible { outline: 2px solid var(--border-strong); outline-offset: 4px; border-radius: 3px; }
