@@ -1,4 +1,7 @@
 /* Shared customer interface: readable secondary text and consistent controls. */
+.sidebar .brand { width:100%; padding:8px 5px; margin-bottom:12px; background:#f8f8fa; border-radius:8px; }
+.sidebar .brand > .brand-artwork { display:block; width:100%; height:auto; }
+.brand-story-artwork { display:block; width:100%; height:auto; margin:16px 0 24px; padding:12px; background:#f8f8fa; border-radius:10px; }
 .page-content { min-width: 0; }
 .page-heading { gap: 20px; }
 .page-heading > div:first-child { min-width: 0; }

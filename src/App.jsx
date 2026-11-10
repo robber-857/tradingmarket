@@ -4,7 +4,7 @@ import MacroCalendar from "./MacroCalendar";
 import NewsWorkspace from "./NewsWorkspace";
 import DailyBrief from "./DailyBrief";
 import HomeOverview from "./HomeOverview";
-import BrandMark from "./BrandMark";
+import BrandMark, { BrandLogo } from "./BrandMark";
 import OptionsWorkspace from "./OptionsWorkspace";
 import OptionStrategies from "./OptionStrategies";
 import {
@@ -1042,10 +1042,7 @@ export default function App() {
           onClick={() => navigate("overview")}
           aria-label="霁明 Clarora首页"
         >
-          <BrandMark />
-          <span className="brand-wordmark">
-            霁明<span>CLARORA · 市场研究</span>
-          </span>
+          <BrandLogo />
         </button>
         <button
           className="brand-about"
@@ -1703,6 +1700,7 @@ export default function App() {
           <>
             <Badge>产品说明</Badge>
             <h2>产品说明</h2>
+            <BrandLogo className="brand-story-artwork" />
             <div className="prose">
               <h3>霁明 Clarora</h3>
               <p className="brand-story-motto">云销雨霁，万象澄明。</p>
