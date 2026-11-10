@@ -74,3 +74,18 @@ def test_google_unverified_email_fails(monkeypatch):
     monkeypatch.setattr(auth.httpx,'AsyncClient',lambda **kw:original(transport=httpx.MockTransport(lambda req:httpx.Response(200,json={'access_token':'x','sub':'u','email':'fake@gmail.com','email_verified':False})),**kw))
     assert 'error=' in c.get('/api/auth/google/callback',params={'state':state,'code':'code'},follow_redirects=False).headers['location']
     assert c.get('/api/account').json()['user'] is None
+
+
+def test_anonymous_session_check_does_not_open_database(monkeypatch):
+    from types import SimpleNamespace
+    from server import membership
+    from fastapi import HTTPException
+    import pytest
+    def unexpected_database():
+        raise AssertionError('Anonymous checks must not connect to the database')
+    monkeypatch.setattr(membership, 'database', unexpected_database)
+    request = SimpleNamespace(cookies={})
+    assert membership.current_user(request) is None
+    with pytest.raises(HTTPException) as error:
+        membership.current_user(request, required=True)
+    assert error.value.status_code == 401

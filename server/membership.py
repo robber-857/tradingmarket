@@ -93,6 +93,10 @@ def redeem_login(token):
 
 def current_user(request, required=False):
     token = request.cookies.get(COOKIE, '')
+    if not token:
+        if required:
+            raise HTTPException(401, '请先登录霁明账户。')
+        return None
     with database() as db:
         row = db.execute('SELECT users.* FROM sessions JOIN users ON users.id=sessions.user_id '
                          'WHERE sessions.hash=? AND sessions.expires>?', (digest(token), time.time())).fetchone()

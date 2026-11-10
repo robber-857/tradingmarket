@@ -2,7 +2,18 @@ import {notifyAuthChange, getAccountSnapshot, getAuthRevision, rememberAccount} 
 
 let hasCheckedAccount=false;
 
-export async function memberRequest(url, options={}) {
+let accountRead=null;
+export function memberRequest(url, options={}) {
+  if(url!=='/api/account') return performRequest(url,options);
+  const revision=getAuthRevision();
+  if(accountRead?.revision===revision) return accountRead.promise;
+  const read={revision};
+  read.promise=performRequest(url,options).finally(()=>{if(accountRead===read)accountRead=null;});
+  accountRead=read;
+  return read.promise;
+}
+
+async function performRequest(url, options={}) {
   const revision=getAuthRevision();
   const response=await fetch(url,{cache:'no-store',...options,headers:{'Content-Type':'application/json',...options.headers}});
   const data=await response.json();

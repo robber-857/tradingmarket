@@ -17,6 +17,7 @@ test('verification immediately publishes account and delayed anonymous reads can
   try{
     notifyAuthChange();
     const pending=memberRequest('/api/account');
+    assert.equal(memberRequest('/api/account'),pending,'concurrent focus checks share one request');
     await memberRequest('/api/auth/verify',{method:'POST'});
     assert.equal(getAccountSnapshot(),user);
     assert.equal(events.at(-1),user);
