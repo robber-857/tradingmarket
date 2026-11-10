@@ -329,7 +329,9 @@ async def call_openai(context, history, question, *, instructions=None, validato
         raw=json.loads(''.join(p.get('text','') for p in parts if p.get('type')=='output_text'))
         answer=(validator or validate_answer)(raw,context)
     except (ValueError,KeyError,TypeError,ValidationError) as exc:
-        raise AIError(502,'回答未通过数字或引用校验，本次不展示。请重试或缩小问题范围。') from exc
+        error = AIError(502,'回答未通过数字或引用校验，本次不展示。请重试或缩小问题范围。')
+        error.validation_reason = str(exc) if type(exc) is ValueError else type(exc).__name__
+        raise error from exc
     return {'answer':answer,'model':model,'responseId':body.get('id'),
         'usage':{k:body.get('usage',{}).get(k) for k in ('input_tokens','output_tokens','total_tokens')}}
 

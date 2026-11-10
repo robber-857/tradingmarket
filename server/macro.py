@@ -524,12 +524,17 @@ async def calendar(start=None, end=None):
                 warnings.append('可选一致预期接口不可用，继续显示官方数据。请检查权限、额度或网络。')
         events = [e for e in events if start <= timestamp(e['releaseAt']).astimezone(ET).date() <= end]
         events.sort(key=lambda e: (e['releaseAt'], e['title']))
+        from . import public_forecasts
+        public_data = public_forecasts.read()
+        public_forecasts.attach(events, public_data)
+        public_forecasts.attach(observations, public_data)
         events = [finalize(e) for e in events]
         observations = [finalize(e) for e in observations]
         return {'events': events, 'observations': observations, 'from': str(start), 'to': str(end),
                 'rangeTimezone': 'America/New_York', 'checkedAt': iso(now()), 'sources': sources,
                 'warnings': list(dict.fromkeys(warnings)), 'consensusStatus': provider_state,
-                'notice': '免费官方来源不提供市场一致预期。最新序列可能已修订，不是历史首发数据库。页面打开时每分钟检查，官方源缓存按各源频率更新；不保证秒级推送。'}
+                'publicForecastStatus': public_forecasts.status(public_data),
+                'notice': '公开预测每天检查一次，调查、机构与模型分列；无可核验值时留空。最新实际值可能已修订，与历史调查值的差不代表首发意外程度。免费源不保证秒级更新。'}
 
 
 def load_snapshot(snapshot_id):

@@ -11,16 +11,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from .financials import VERSION, build_report
 from .sec import COMPANIES, ROOT, DataUnavailable, SymbolError, fetch_company, resolve_company, search_companies, normalize_symbol
 from .valuation import Assumptions, WaccInputs, BetaInputs, calculate_beta, calculate_wacc, valuation_bundle
-from . import narrative, market, macro, macro_ai, news, news_ai, daily_brief, options, options_ai, option_strategies, live_strategies
+from . import narrative, market, macro, macro_ai, news, news_ai, daily_brief, options, options_ai, option_strategies, live_strategies, public_forecasts
+from . import dashboard_market
+
 
 @asynccontextmanager
 async def lifespan(app):
     worker = asyncio.create_task(news.background()) if os.getenv('NEWS_BACKGROUND_ENABLED', '1') != '0' else None
     daily_worker = asyncio.create_task(daily_brief.background()) if os.getenv('NEWS_BACKGROUND_ENABLED', '1') != '0' else None
+    forecast_worker = asyncio.create_task(public_forecasts.background()) if os.getenv('PUBLIC_FORECAST_BACKGROUND_ENABLED', '1') != '0' else None
     try:
         yield
     finally:
-        for task in (worker, daily_worker):
+        for task in (worker, daily_worker, forecast_worker):
             if task:
                 task.cancel()
                 with suppress(asyncio.CancelledError): await task
@@ -31,6 +34,11 @@ app.add_middleware(CORSMiddleware, allow_origins=['http://127.0.0.1:5173','http:
                    allow_methods=['GET','POST'],allow_headers=['Content-Type'])
 REPORTS=ROOT/'server'/'reports'
 REPORTS.mkdir(exist_ok=True)
+
+
+@app.get('/api/market/overview')
+async def market_overview():
+    return await dashboard_market.overview()
 
 
 @app.get('/api/briefs')

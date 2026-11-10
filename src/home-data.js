@@ -8,12 +8,12 @@ export function recentNews(items=[],category='all',now=Date.now()) {
   return items.filter(a=>{const age=now-Date.parse(a.publishedAt);return Number.isFinite(age)&&age>=0&&age<=86400000&&(category==='all'||a.categories?.includes(category));})
     .sort((a,b)=>Number(!!a.stale)-Number(!!b.stale)||Date.parse(b.publishedAt)-Date.parse(a.publishedAt));
 }
-export function newsSelection(items,category='all',now=Date.now()) {
+export function newsSelection(items,category='all',now=Date.now(),limit=6) {
   const list=recentNews(items,category,now);
-  if(category!=='all')return list.slice(0,6);
+  if(category!=='all')return list.slice(0,limit);
   const picks=[];
   for(const tag of ['stocks','crypto','macro']){const item=list.find(a=>a.categories?.includes(tag)&&!picks.some(p=>p.id===a.id));if(item)picks.push(item);}
-  return [...picks,...list.filter(a=>!picks.some(p=>p.id===a.id))].slice(0,6);
+  return [...picks,...list.filter(a=>!picks.some(p=>p.id===a.id))].slice(0,limit);
 }
 export function latestReady(index) {
   return [...(index?.editions||[])].filter(e=>e.status==='ready').sort((a,b)=>b.day.localeCompare(a.day))[0]||null;
@@ -34,7 +34,7 @@ export function agenda(events=[],now=Date.now()) {
   const upcoming=rows.filter(e=>['upcoming','date-only'].includes(e.displayStatus));
   const sevenDays=upcoming.filter(e=>e.timePrecision==='date-only'?dayKey(e.releaseAt,'America/New_York')<=dayKey(now+7*86400000,'America/New_York'):Date.parse(e.releaseAt)<=now+7*86400000);
   const recent=rows.filter(e=>['pending','released'].includes(e.displayStatus)&&now-Date.parse(e.releaseAt)<=2*86400000).reverse();
-  return {upcoming,sevenDays,recent,visible:[...recent.filter(e=>e.displayStatus==='pending'),...upcoming,...recent.filter(e=>e.displayStatus==='released')].slice(0,3)};
+  return {upcoming,sevenDays,recent,visible:[...recent.filter(e=>e.displayStatus==='pending'),...upcoming,...recent.filter(e=>e.displayStatus==='released')]};
 }
 export function releaseLabel(event,zone) {
   if(!event.releaseAt)return '发布时间待核验';

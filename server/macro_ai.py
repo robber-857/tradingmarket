@@ -25,6 +25,7 @@ INSTRUCTIONS = """你是中文宏观研究编辑。只用事件证据账本陈�
 用简洁语言回答：一句关键判断，随后两条 insight 分别解释美股与 BTC/ETH 的可能传导，最后列待观察信号和局限。总长尽量三百汉字以内。用户追问时聚焦问题。
 所有数字和日期只能用 {{ID}} 占位符，且 ID 必须在该句 citations。数值自带单位。不要自行写阿拉伯数字、中文数量、URL 或引用账本外资料。value=null 不能引用成数值、不能视为零。
 forecast 缺失就必须说明没有一致预期，不能说超预期或低于预期；actual 缺失只能给条件情景，不能把预计发布时间已过当作已公布。
+publicForecasts 中 institution 是单家机构预测，model 是模型预测，均不等于市场一致预期。引用时须明确类型与来源；stale 只能作为旧参考，collectedAfterRelease 表示事后收录，不能声称当时系统已知。调查值与修订后实际值的差不能称为首发意外程度。
 status=released 也不代表实时：严格遵守 retrievedAt、stale、valueBasis。BLS 最新序列的计算值可能修订，不能声称为首发值或当时可交易信息；没有 releaseAt 就不能推断发布日期。季调环比与未季调同比不可混用。
 FOMC 区间与供应商单一利率报价不同；不能把有效联邦基金利率当作目标利率。未输入声明正文、点阵图、发布会，不得判断官员口吻、投票或政策指引。
 分析逻辑：通胀/就业→利率路径与增长预期→美债收益率和美元→美股估值/盈利、加密资产流动性与风险偏好。此链条仅是条件推论。
@@ -48,7 +49,11 @@ def context_for(e):
                                  ('surprise', 'E_SURPRISE', '实际值减一致预期')]:
         m = e.get(field)
         add(ident, label, m['display'] if m else None, m['display'] if m else '未提供',
-            e.get('previousSourceUrl') if field == 'previous' else macro.TE_DOCS if field == 'forecast' else None)
+            e.get('previousSourceUrl') if field == 'previous' else e.get('forecastSourceUrl', macro.TE_DOCS) if field == 'forecast' else None)
+    for index, row in enumerate(e.get('publicForecasts', [])):
+        kind = {'consensus': '调查预期', 'institution': '机构预测', 'model': '模型预测'}[row['kind']]
+        add(f'E_PUBLIC_{index}', f"{kind} · {row['source']}", row['metric']['display'], row['metric']['display'], row['sourceUrl'])
+        registry[f'E_PUBLIC_{index}']['retrievedAt'] = row['retrievedAt']
     return {'mode': 'macro', 'registry': registry, 'event': e, 'promptVersion': VERSION}
 
 

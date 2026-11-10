@@ -1,11 +1,13 @@
 import secrets
 import time
 import re
+import logging
 from collections import deque
 from pydantic import BaseModel, ConfigDict, Field
 from . import options, narrative, news, news_ai
 
 SESSIONS, ACTIVE, CALLS = {}, set(), deque()
+logger = logging.getLogger(__name__)
 
 
 class Request(BaseModel):
@@ -79,7 +81,8 @@ def live_context(data):
     return {'mode':'live_strategy_comparison','registry':registry,'evidence':evidence,'snapshotId':data['snapshotId']}
 
 
-INSTRUCTIONS = """你是中文期权研究讲解员。先一句核心洞察，再两三条解释与风险，尽量三百汉字内。
+INSTRUCTIONS = """你是中文期权研究讲解员。你的任务是解释已有指标的含义、适用条件与局限，不是预测价格或创造指标。不提供目标价、未来价格区间、涨跌概率或买卖建议。优先定性解释，不必重复页面数字；需要具体数值时仅使用证据占位符。没有相关指标就直接说明无法判断。
+先一句核心洞察，再两三条解释与风险，尽量三百汉字内。
 只能基于本次确定性计算的证据，不自行计算或补造数字。每条 conclusion/insight 引用 S_1；任何数字必须用已有 {{N_1_...}} 占位符，数字引用由服务器从有效占位符补齐。禁止直接输出数字、日期、URL、Markdown 链接或裸 ID，链接由服务器提供。不要输出日期，用“所选到期日”代替。每条最多用三个数字，优先选最有解释力的指标。
 不要把持仓峰值称为支撑、阻力或压力位，不把 Put 更多称为偏防守、偏看空或偏看多。唯一可直接描述的是样本持仓数量和集中位置；缺失 OI 的合计只代表可用字段。金额标签如跨式组合两腿 Ask 合计不能描述成单腿 Ask；占位符 display 已含货币或百分比单位，不重复添加或自行换算。
 明确数据是延迟的公开链，缺少逐笔成交、买卖主动性、历史基线和交易所完整时间。OI 和 Put/Call 比不证明看多看空；Volume/OI 只是关注筛选，不是已确认机构异动。无法提供真实胜率、目标价、收益保证。
@@ -118,6 +121,33 @@ def validate(raw, ctx):
     return result
 
 
+def basic_answer(ctx):
+    """A deterministic, cited explanation; never displays rejected model prose."""
+    def claim(text):
+        return {'kind':'inference','text':text,'citations':['S_1']}
+    if ctx['mode']=='options':
+        lead='这份快照用于理解期权持仓分布和成本门槛，不能据此预测股价方向。'
+        insights=[claim('持仓量和成交量反映样本数量，不能识别买卖主动性，也不能确认机构意图。')]
+        ratio=next((k for k,v in ctx['registry'].items() if v['label']=='Put/Call OI 比'),None)
+        if ratio:
+            insights.append(claim('当前样本的 Put/Call 持仓比为 {{'+ratio+'}}，仅表示两类合约的数量比例，不代表看涨或看跌概率。'))
+        if ctx['evidence']['atmStatus']['available']:
+            insights.append(claim('跨式成本与盈亏平衡点解释所选到期日的成本门槛，不是股价预测区间；中间价不保证能够成交。'))
+        else:
+            insights.append(claim('当前缺少可用的平值组合，无法据此解释跨式成本；缺失值不能当作零。'))
+        watch='关注报价时点、买卖价差与数据缺失；模型波动率依赖计算假设。'
+        limits='公开期权链存在延迟；缺少逐笔成交、买卖主动性和历史基线。'
+    else:
+        live=ctx['mode']=='live_strategy_comparison'
+        lead='这些组合展示给定建仓条件下的成本与风险，不是未来价格或收益预测。'
+        insights=[claim('净支出描述建仓现金流；最大收益、最大损失与盈亏平衡点属于给定输入下的到期情景，不能当作预期收益。'),
+                  claim('组合敏感度用于解释价格、时间和波动率变化的影响；缺失的敏感度不能当作零，也不足以判断哪个方案更安全。' if live else '到期前仍有时间价值、波动率和指派风险，不能把到期盈亏曲线当作持有期间的实际盈亏。')]
+        watch='关注实际合约方向、份数、资金占用和提前指派风险。'
+        limits='比较基于延迟报价与假设建仓；中间价不保证成交，净支出不是保证金。' if live else '当前输入为教学假设，不代表真实可成交报价。'
+    return validate({'conclusion':claim(lead),'insights':insights,'watch_next':watch,'limitations':limits,
+                     'followups':['这些数据能说明什么？']},ctx)
+
+
 async def explain(req):
     data = options.load_snapshot(req.snapshot_id); ctx = context(data); now = time.monotonic()
     for sid in list(SESSIONS):
@@ -131,7 +161,15 @@ async def explain(req):
     question = req.question.strip() or ('比较这些真实合约建仓情景的净成本、最大损失、组合 Greeks 与执行风险，说明差异和数据缺口。' if ctx['mode']=='live_strategy_comparison' else '解读这份期权计算最值得关注的分布、财报波动成本和风险；策略示例则解释盈亏与适用条件。')
     ACTIVE.add(sid);CALLS.append(now)
     try:
-        result = await narrative.call_openai(ctx,history,question,instructions=INSTRUCTIONS,validator=validate)
+        try:
+            result = await narrative.call_openai(ctx,history,question,instructions=INSTRUCTIONS,validator=validate)
+            result['generationMode'] = 'ai'
+        except narrative.AIError as exc:
+            reason = getattr(exc,'validation_reason','upstream_unavailable')
+            logger.warning('Options explanation fallback snapshot=%s reason=%s',req.snapshot_id,reason)
+            result = {'answer':basic_answer(ctx),'model':None,'responseId':None,'usage':{},
+                      'generationMode':'evidence_summary',
+                      'generationNotice':'本次展示基于当前数据的基础解读，未采用未通过校验或未完成的 AI 回答。'}
         history.append({'question':question,'answer':result['answer']})
         if len(SESSIONS)>=100:
             old = [k for k in SESSIONS if k not in ACTIVE]

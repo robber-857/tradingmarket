@@ -17,6 +17,16 @@ test('mixed topic coverage avoids duplicating cross-listed articles and caps lis
   assert.deepEqual(chosen.slice(0,3).map(a=>a.id),['cross','coin','macro']);
   assert.equal(chosen.length,6);assert.equal(new Set(chosen.map(a=>a.id)).size,6);
 });
+test('dashboard pagination can access all news without losing topic diversity',()=>{
+  const rows=Array.from({length:20},(_,i)=>article('s'+i,i+1));
+  const chosen=newsSelection(rows,'all',now,Infinity);
+  assert.equal(chosen.length,20);
+  assert.equal(new Set(chosen.map(a=>a.id)).size,20);
+});
+test('agenda retains all events for paging',()=>{
+  const rows=Array.from({length:8},(_,i)=>event('e'+i,`2026-11-${String(i+11).padStart(2,'0')}T13:30:00Z`));
+  assert.equal(agenda(rows,now).visible.length,8);
+});
 test('brief selects latest completed edition, never failed or generating edition',()=>{
   assert.equal(latestReady({editions:[{day:'2026-11-10',status:'failed'},{day:'2026-11-08',status:'ready'},{day:'2026-11-09',status:'ready'},{day:'2026-11-11',status:'generating'}]}).day,'2026-11-09');
   assert.equal(latestReady({editions:[]}),null);

@@ -216,3 +216,34 @@ def test_numeric_citations_derived_only_from_verified_placeholders():
     with pytest.raises(ValueError):options_ai.validate(raw,ctx)
     raw['conclusion']['text']='来源价格 {{N_1_1}}。';raw['conclusion']['citations']=['N_1_1']
     with pytest.raises(ValueError):options_ai.validate(raw,ctx)
+
+
+@pytest.mark.parametrize('failure',['validation','timeout','unavailable'])
+def test_option_ai_failure_returns_verified_explanation(monkeypatch, failure, caplog):
+    r=o.analyze(chain(),o.AnalysisRequest(symbol='TEST'))
+    news.atomic_json(o.SNAPSHOTS/(r['snapshotId']+'.json'),r)
+    async def ai(*a,**kw):
+        error=narrative.AIError(502 if failure=='validation' else 503,'unavailable')
+        if failure=='validation':error.validation_reason='Unverified number or URL'
+        raise error
+    monkeypatch.setattr(narrative,'call_openai',ai)
+    result=asyncio.run(options_ai.explain(options_ai.Request(snapshot_id=r['snapshotId'])))
+    assert result['generationMode']=='evidence_summary'
+    assert result['generationNotice']
+    assert result['answer']['insights']
+    assert result['responseId'] is None
+    assert not options_ai.ACTIVE
+    assert 'snapshot='+r['snapshotId'] in caplog.text
+    for claim in [result['answer']['conclusion'],*result['answer']['insights']]:
+        assert 'S_1' in claim['citations']
+        assert all(i in result['citations'] for i in claim['citations'])
+        assert '{{' not in claim['text']
+
+
+def test_basic_explanation_handles_missing_atm_and_ratio():
+    data=o.analyze(chain(),o.AnalysisRequest(symbol='TEST'))
+    data['atm']=None
+    data['totals']['oiRatio']=None
+    result=options_ai.basic_answer(options_ai.context(data))
+    assert any('缺少可用的平值组合' in c['text'] for c in result['insights'])
+    assert not any('持仓比为' in c['text'] for c in result['insights'])
