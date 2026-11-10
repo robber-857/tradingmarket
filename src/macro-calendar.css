@@ -42,3 +42,19 @@
 .macro-language-toggle { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .macro-language-toggle button { padding:6px 10px; border:1px solid var(--border); border-radius:5px; font-size:12px; }
 .macro-language-toggle button[aria-pressed="true"] { background:var(--surface-subtle); color:var(--text); border-color:var(--muted); }
+
+/* Align the date filters and separate their explanation from navigation. */
+.macro-range { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.macro-range label { min-width:0; gap:7px; font-size:12px; line-height:1.5; }
+.macro-range input, .macro-range select { width:100%; min-width:0; height:40px; box-sizing:border-box; font-size:12px; padding:8px 10px; }
+.macro-range-help { display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding:14px 24px 20px; }
+.macro-range-help .macro-range-note { padding:0; margin:0; font-size:12px; line-height:1.8; }
+.macro-range-help > .button { min-height:38px; white-space:nowrap; }
+.macro-list-heading { gap:16px; align-items:baseline; }
+.macro-list-heading > span { flex-shrink:0; }
+@media(max-width:600px) {
+  .macro-range { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .macro-range label:last-child { grid-column:1 / -1; }
+  .macro-range-help { padding:14px 15px 20px; }
+  .macro-list-heading { flex-wrap:wrap; gap:8px; }
+}
