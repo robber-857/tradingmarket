@@ -4,6 +4,7 @@ import MacroCalendar from "./MacroCalendar";
 import NewsWorkspace from "./NewsWorkspace";
 import DailyBrief from "./DailyBrief";
 import HomeOverview from "./HomeOverview";
+import Watchlist from "./Watchlist";
 import BrandMark, { BrandLogo } from "./BrandMark";
 import OptionsWorkspace from "./OptionsWorkspace";
 import OptionStrategies from "./OptionStrategies";
@@ -774,84 +775,7 @@ export default function App() {
     );
   }
   function renderWatchlist() {
-    return (
-      <section className="panel">
-        <PanelTitle
-          title="我的研究清单"
-          sub={`${watch.length} 个关注资产 · 保存在当前浏览器`}
-          action="添加资产"
-          onClick={() => setSearchOpen(true)}
-        />
-        {watch.length ? (
-          <div className="table-wrap">
-            <table className="watch-table">
-              <thead>
-                <tr>
-                  <th>资产</th>
-                  <th>模拟价格 / USD</th>
-                  <th>模拟涨跌</th>
-                  <th>走势</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {watch.map((s) => assets.find((a) => a.symbol === s) || {symbol:s,name:"已关注美股 · 点击研究",type:"美股",price:"—",change:"—",values:[],color:"var(--surface-selected)"})
-                  .map((a) => (
-                    <tr key={a.symbol}>
-                      <td>
-                        <button
-                          className="asset-table-name"
-                          onClick={() => openAsset(a)}
-                        >
-                          <span
-                            className="asset-logo"
-                            style={{ background: a.color }}
-                          >
-                            {a.symbol[0]}
-                          </span>
-                          <span>
-                            <b>{a.symbol}</b>
-                            <small>{a.name}</small>
-                          </span>
-                        </button>
-                      </td>
-                      <td>{a.price}</td>
-                      <td className={a.change.includes("−") ? "down" : "up"}>
-                        {a.change}
-                      </td>
-                      <td>
-                        {a.values.length ? <Sparkline values={a.values} /> : <span className="muted">研究页查看行情</span>}
-                      </td>
-                      <td>
-                        <button
-                          className="icon-button"
-                          aria-label={`移除关注 ${a.symbol}`}
-                          onClick={() => toggleWatch(a.symbol)}
-                        >
-                          <Star size={17} fill="currentColor" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty-state">
-            <Star size={36} />
-            <h3>从一个资产开始研究</h3>
-            <p>搜索资产，然后加入关注清单。</p>
-            <button
-              className="button primary"
-              onClick={() => setSearchOpen(true)}
-            >
-              添加资产
-              <Plus size={16} />
-            </button>
-          </div>
-        )}
-      </section>
-    );
+    return <Watchlist watch={watch} assets={assets} onAdd={() => setSearchOpen(true)} onOpen={openAsset} onRemove={toggleWatch} timezone={settings.timezone} />;
   }
   function renderAcademy() {
     const list = courses.filter(

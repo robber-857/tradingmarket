@@ -42,6 +42,14 @@ async def market_overview():
     return await dashboard_market.overview()
 
 
+@app.get('/api/market/watchlist')
+async def watchlist_market(symbols: str = Query('', max_length=800)):
+    try:
+        return await dashboard_market.watchlist(symbols)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
 @app.get('/api/briefs')
 def briefs(day:date | None=None):
     try: return daily_brief.listing(day.isoformat() if day else None)

@@ -1,0 +1,13 @@
+.watchlist-panel .panel-title { flex-wrap:wrap; gap:16px; }
+.watchlist-panel .panel-title > div:last-child { flex-wrap:wrap; }
+.watchlist-panel .watch-table .fine-print { white-space:normal; }
+@media(max-width:600px) {
+  .watchlist-panel .watch-table { table-layout:fixed; }
+  .watchlist-panel .watch-table th, .watchlist-panel .watch-table td { padding:14px 4px; white-space:normal; overflow-wrap:anywhere; }
+  .watchlist-panel .watch-table th:nth-child(1) { width:29%; }
+  .watchlist-panel .watch-table th:nth-child(2) { width:39%; }
+  .watchlist-panel .watch-table th:nth-child(3) { width:22%; }
+  .watchlist-panel .watch-table th:nth-child(5) { width:10%; }
+  .watchlist-panel .asset-logo { display:none; }
+  .watchlist-panel .asset-table-name { max-width:100%; }
+}

@@ -3,6 +3,7 @@ import asyncio
 from copy import deepcopy
 from datetime import datetime, timezone
 import math
+import re
 import time
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -23,6 +24,31 @@ CATALOG = [
 CACHE = news.ROOT / 'server/cache/dashboard_market'
 _cache = {}
 _lock = asyncio.Lock()
+_watch_cache = {}
+
+
+async def watchlist(symbols):
+    symbols = list(dict.fromkeys(s.strip().upper() for s in symbols.split(',') if s.strip()))
+    if len(symbols) > 50 or any(not re.fullmatch(r'[A-Z][A-Z0-9.-]{0,14}', s) for s in symbols):
+        raise ValueError('关注资产代码无效或超过 50 个')
+    if not symbols:
+        return {'items': []}
+    aliases = {'SPX': '^GSPC', 'NDX': '^NDX', 'BTC': 'BTC-USD', 'ETH': 'ETH-USD'}
+    semaphore = asyncio.Semaphore(6)
+    async with httpx.AsyncClient(timeout=httpx.Timeout(12, connect=5), headers={'User-Agent':'Mozilla/5.0'}) as client:
+        async def load(symbol):
+            async with semaphore:
+                cached = _watch_cache.get(symbol)
+                if cached and time.monotonic() - cached[0] < 300:
+                    return deepcopy(cached[1])
+                provider = aliases.get(symbol, symbol.replace('.', '-'))
+                item = await get_item(client, ('watch-'+symbol, provider, symbol, '关注资产', '点' if symbol in ('SPX','NDX') else 'USD'))
+                item['watchSymbol'] = symbol
+                _watch_cache[symbol] = (time.monotonic(), deepcopy(item))
+                if len(_watch_cache) > 500:
+                    _watch_cache.pop(next(iter(_watch_cache)))
+                return item
+        return {'items': await asyncio.gather(*(load(s) for s in symbols))}
 
 
 def finite(value):
