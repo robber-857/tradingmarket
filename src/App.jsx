@@ -359,8 +359,7 @@ export default function App() {
   const modalRef = useRef(null);
   const toastTimer = useRef(null);
   const navigate = (p) => {
-    setPage(p.split("?")[0]);
-    setCalendarPreset(new URLSearchParams(p.split("?")[1]).get("range"));
+    setPage(p);
     location.hash = p;
     setMobile(false);
     setSearchOpen(false);
@@ -372,7 +371,7 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(""), 3200);
   };
   useEffect(() => {
-    const handler = () => { setPage(location.hash.slice(1).split("?")[0] || "overview"); setCalendarPreset(new URLSearchParams(location.hash.split("?")[1]).get("range")); };
+    const handler = () => setPage(location.hash.slice(1) || "overview");
     window.addEventListener("hashchange", handler);
     return () => window.removeEventListener("hashchange", handler);
   }, []);
