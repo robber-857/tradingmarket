@@ -8,13 +8,13 @@
 
 已加入 [会员与账户](http://127.0.0.1:5173/#membership)：研究／高级／专家三档、CNY/AUD/USD 试定价、普通与深度 AI 独立额度、邮箱一次性登录、服务端权限和账本。交易学院区分免费与会员课，高级及专家会员在有效期内解锁会员课。关注清单支持登录后手动保存/读取，财报与估值 AI 研究可保存到账户并回读。
 
-当前仍为本机开发：默认 `CLARORA_MODE=local`，仅本地可显示开发登录链接；`public` 模式需要 HTTPS 地址和真实 SMTP。**正式收款未开放**。测试 Checkout、回调、付款发权益、Stripe 自动续费/取消、支付宝与 PayPal 单次购买、退款申请/审核已实现；尚未配置商户测试凭据，未完成真实渠道联调。市场情绪仍待供应商接入。不得将试定价或测试权益当成正式订阅。配置步骤见 [测试支付与退款](docs/test-payments.md)。
+已部署公开内测站点 [Clarora](https://clarora-market-research.vercel.app)，使用 Supabase PostgreSQL 与私有 S3 存储。本地仍可使用 SQLite，默认 `CLARORA_MODE=local`；两端数据不自动同步。线上 public 模式关闭邮箱登录、支付和自动 AI 简报，等待真实 SMTP / 商户配置。测试 Checkout、回调、权益、续费取消和退款代码已实现，但真实渠道联调与正式收款未开放。配置见 [测试支付](docs/test-payments.md) 和 [部署说明](docs/vercel-supabase-deployment.md)。
 
 完整任务拆解、会员规则、验证与剩余依赖见 [ToC P0 任务表](docs/toc-launch-p0.md)。[文档目录](docs/README.md) 统一组织 PRD、模块方法、配置及验收；换聊天从 [开发交接](docs/HANDOFF-2026-11-10-TOC-BILLING.md) 开始。
 
 面向个人研究者的美股、加密资产与宏观研究工作空间。将市场总览、新闻、官方经济发布、公司财报、估值和期权研究连接起来，保留数据来源、计算假设与 AI 引用，帮助用户形成自己的判断。
 
-> 文档更新：2026-11-10。以下描述当前工作区的实现与边界。本次提交仅整理文档；会员及云端迁移代码仍由并行聊天继续处理，不能将本地能力描述视为已随文档发布。未完成公网部署、真实支付联调、SMTP 投递或邮件推送。
+> 文档更新：2026-11-10。迁移代码已提交为 `69fc9e6`。独立复核确认迁入数据库与备份一致，但发现线上股票搜索 / 财报的 S3 读取兼容缺陷；本地已修复并通过 PostgreSQL 回归，尚未部署该修复。详见 [迁移复核](docs/validation-2026-11-10-migration-audit.md)。公网可访问不代表全部功能或收费流程已验收。
 
 ## 功能与数据状态
 
@@ -54,11 +54,11 @@
 cd D:\tradingknowledge
 npm ci
 python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r server/requirements.lock.txt
+.venv\Scripts\python.exe -m pip install -r requirements.txt -r server/requirements.lock.txt
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-保留已有 `.env`，不要覆盖本机密钥。根据需要填写：
+根目录依赖包含 PostgreSQL / S3 适配器，后端锁定清单补充本地测试依赖。保留已有 `.env`，不要覆盖本机密钥；线上私有配置与本地开发配置分开，迁移不会自动同步两端数据。根据需要填写：
 
 | 配置项 | 用途 |
 | --- | --- |

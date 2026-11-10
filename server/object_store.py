@@ -31,16 +31,19 @@ class ObjectPath(PurePosixPath):
     def mkdir(self, *args, **kwargs):
         pass  # Object stores do not have directories.
 
-    def read_text(self, encoding='utf-8'):
+    def read_bytes(self):
         from botocore.exceptions import ClientError
         try:
             response = client().get_object(Bucket=os.environ['S3_BUCKET'], Key=self._key())
             with response['Body'] as stream:
-                return stream.read().decode(encoding)
+                return stream.read()
         except ClientError as exc:
             if exc.response['Error']['Code'] in ('NoSuchKey', '404'):
                 raise FileNotFoundError(str(self)) from exc
             raise
+
+    def read_text(self, encoding='utf-8'):
+        return self.read_bytes().decode(encoding)
 
     def write_text(self, data, encoding='utf-8'):
         client().put_object(Bucket=os.environ['S3_BUCKET'], Key=self._key(),

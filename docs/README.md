@@ -2,7 +2,7 @@
 
 更新：2026-11-10。产品状态以总 PRD 为入口，开发接续以交接文档为入口；验证记录保留当时结果，不覆盖历史测试数字。
 
-当前范围为 ToC P0 与测试支付。正式收款关闭，真实沙盒交易未完成。另一聊天正在修改云端迁移代码，本次只整理并提交文档；“本地已实现”不表示对应代码已全部提交或完成部署。
+当前范围为 ToC P0 与测试支付。正式收款关闭，真实沙盒交易未完成。迁移已提交并完成公开内测部署；线上邮箱登录、支付和自动 AI 简报关闭。独立复核发现股票搜索 / 财报 S3 字节读取缺口，本地已修复，待发布；详见 [迁移复核](validation-2026-11-10-migration-audit.md)。
 
 ## 从哪里开始
 
@@ -27,9 +27,14 @@
 | 宏观和机构预测 | [宏观来源](macro-data.md) · [公开预测](public-forecasts.md) |
 | 新闻、每日简报与期权 | [市场新闻](market-news.md) · [每日简报与期权](daily-brief-options.md) · [真实期权策略](live-option-strategies.md) |
 
+## 部署与迁移
+
+- [Vercel / Supabase 部署与 AWS 迁移边界](vercel-supabase-deployment.md)：资源、环境变量、数据导入、cron、备份和回退。
+- [数据迁移独立复核](validation-2026-11-10-migration-audit.md)：数据库逐行比较、S3 内容比对、权限 / 线上接口检查，以及财报兼容修复的发布状态。
+
 ## 验证记录
 
-最新会员 / 支付阶段：[2026-11-10 会员与支付 v2](validation-2026-11-10-membership-billing-v2.md)，记录 348 项后端、14 项前端及构建 / 浏览器检查。它覆盖当时本地代码和模拟渠道，不覆盖随后并行修改的数据库 / 部署代码，也不代表真实支付成功。
+迁移后最新检查见上方独立复核；以下保留历史验收。会员 / 支付阶段：[2026-11-10 会员与支付 v2](validation-2026-11-10-membership-billing-v2.md)，记录 348 项后端、14 项前端及构建 / 浏览器检查。它覆盖当时本地代码和模拟渠道，不覆盖随后并行修改的数据库 / 部署代码，也不代表真实支付成功。
 
 - 2026-11-10：[首页](validation-2026-11-10-homepage.md)、[简报与期权](validation-2026-11-10-daily-options.md)、[真实策略](validation-2026-11-10-live-strategies.md)、[响应式](responsive-validation-2026-11-10.md)。
 - 2026-11-09：[AI](validation-2026-11-09-ai.md)、[宏观](validation-2026-11-09-macro.md)、[行情](validation-2026-11-09-market.md)、[新闻](validation-2026-11-09-news.md)、[股票搜索](validation-2026-11-09-stock-search.md)。

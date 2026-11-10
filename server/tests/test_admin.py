@@ -118,6 +118,7 @@ def test_concurrent_duplicate_provision_only_one_grant(admin):
         assert db.execute('SELECT count(*) FROM grants').fetchone()[0] == 1
 
 
+@pytest.mark.usefixtures('public_database')
 def test_public_origin_and_admin_access(monkeypatch):
     monkeypatch.setenv('CLARORA_MODE', 'public')
     monkeypatch.setenv('CLARORA_PUBLIC_URL', 'https://clarora.example')

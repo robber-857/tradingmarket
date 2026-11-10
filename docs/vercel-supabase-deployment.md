@@ -2,6 +2,8 @@
 
 更新：2026-11-10，Australia/Sydney。
 
+迁移已在 `69fc9e6` 提交。后续独立复核见 [迁移检查与财报修复](validation-2026-11-10-migration-audit.md)：数据库与备份逐行一致，但线上股票搜索 / 财报因 S3 缺失 read_bytes 返回 500。本地修复及回归已完成，尚未部署；下方首次发布记录不能作为该修复上线证据。
+
 ## 当前资源
 
 - Vercel：`eltons-projects-1c805292/clarora-market-research`。
@@ -70,7 +72,7 @@ Vercel 回滚仅回滚代码，不回滚 PostgreSQL 或对象存储；有云端�
 - Python API 保留 FastAPI；定时任务改由 EventBridge 调用相同鉴权接口或任务入口。
 - 业务数据不依赖 Supabase Auth、PostgREST 或专用数据库函数；Supabase 专有 cron/storage 配置与业务 schema 分离。
 
-## 验证记录
+## 首次迁移验证记录（历史）
 
 - 隔离 PostgreSQL 全量后端回归：355 项通过（2026-11-10 最终发布前重跑）。
 - 前端数据测试：14 项通过；生产构建通过。
@@ -80,7 +82,7 @@ Vercel 回滚仅回滚代码，不回滚 PostgreSQL 或对象存储；有云端�
 - 上述入口检查在本机执行；Vercel 远端构建和浏览器验收需以实际部署结果为准。
 - Vercel 构建器拒绝根 requirements 的嵌套引用后，已改为平铺生产依赖清单，并排除 pytest 等测试依赖。
 
-## 已发布结果
+## 首次发布结果（历史）
 
 - Production：`https://clarora-market-research.vercel.app`。
 - 部署 ID：`dpl_5Ae3sqQE88fraLTBJezx7i3iUR12`，Vercel 状态 READY，固定域名已绑定。

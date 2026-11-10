@@ -3,6 +3,13 @@ import os
 from urllib.parse import urlparse
 
 
+@pytest.fixture
+def public_database():
+    """Public mode intentionally disallows SQLite after the cloud migration."""
+    if not os.getenv('TEST_DATABASE_URL'):
+        pytest.skip('Public-mode database checks require isolated TEST_DATABASE_URL')
+
+
 @pytest.fixture(autouse=True)
 def no_background_network(monkeypatch, tmp_path):
     test_url = os.getenv('TEST_DATABASE_URL')

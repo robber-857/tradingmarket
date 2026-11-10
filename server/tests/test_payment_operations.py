@@ -141,6 +141,7 @@ def test_reconciliation_requires_test_switch_and_valid_note(admin,monkeypatch):
     assert admin.post(url,json={'reason':'check request'}).status_code==503
 
 
+@pytest.mark.usefixtures('public_database')
 def test_public_origin_check_remains_required(monkeypatch):
     monkeypatch.setenv('CLARORA_MODE','public')
     monkeypatch.setenv('CLARORA_PUBLIC_URL','https://clarora.example')

@@ -9,7 +9,7 @@
 - 产品名为霁明 Clarora，旧 `meridian.*` 浏览器存储键保留兼容。
 - 仅 ToC 与测试支付；不做 ToB，不开启正式收款，不把模拟测试当作实际沙盒成功。
 - 保留所有已有未提交改动，不执行 reset / clean，不删除数据库、缓存或未跟踪文件。
-- 用户已确认另一个聊天正在修改同一工作区的云端迁移。**本次仅提交整理后的文档，会员及迁移代码不纳入本次提交。** 后续先检查最新 Git 状态与并行修改。
+- 另一聊天的迁移已完成并提交为 `69fc9e6`；本次独立复核发现财报 S3 兼容问题，修复与文档位于本地工作区，尚未提交或部署。接续先检查 Git，勿将线上旧版误当作本地修复版。
 - 不输出或提交 `.env`、密钥、数据库、真实订单或一次性登录链接。管理员邮箱仅保留在私有配置。
 
 ## 2. 已完成的本地功能
@@ -87,31 +87,31 @@ Invoke-RestMethod http://127.0.0.1:8001/api/health
 Invoke-RestMethod http://127.0.0.1:5173/api/billing/status
 ```
 
-确认服务未运行后，两个终端分别运行 `npm run api` 和 `npm run dev -- --port 5173 --strictPort`。Python 修改按实际启动方式重载，不与另一聊天同时重启。
+确认服务未运行后，两个终端分别运行 `npm run api` 和 `npm run dev -- --port 5173 --strictPort`。Python 修改按实际启动方式重载；本次复核未重启 5173 / 8001。
 
 本地已验证账号库默认 `server/cache/membership.sqlite3`，可由 `CLARORA_DATABASE` 指定。保留账号 / 会话 / 权益 / 用量 / 保存、付款 / 退款 / 回调、手动授权 / 审计数据；不通过删库重置测试。JSON 缓存、简报和研究快照同样保留。`output/` 截图 / 日志不进 Git。
 
 `CLARORA_MODE=local` 只用于本机，匿名研究保留本地工作流，已登录计量；公网由迁移工作落实 public、HTTPS、SMTP、持久化和访问控制，不能仅上传静态页面。
 
-## 6. 并行数据库 / 云端迁移
+## 6. 已完成迁移与本次复核
 
-用户已确认另一聊天正在修改项目。当前工作区已出现 `server/database.py`、`server/schema.sql`、`server/object_store.py`、`server/session_store.py`、`supabase/migrations/` 及部署适配；多处研究缓存、账户和简报调用也在变化。文件存在不是迁移已执行的证据，本次不修改、暂存或提交这些代码，不执行远程 SQL、不部署。
+迁移提交：`69fc9e6`，包含业务依赖、PostgreSQL / 私有 S3、会话持久化、部署和 cron。公开站点为 `https://clarora-market-research.vercel.app`；私有配置 `.env.supabase.local` 不进 Git。完整资源、配置和回退见 [部署说明](vercel-supabase-deployment.md)。本地 SQLite 与云端不双向同步。
 
-迁移完成后必须补充：
+本次只读核对：19 张业务表中，16 张会员来源表及 1 张简报来源表与 SQLite 备份逐行一致；2 个用户、1 个会话、12 条限流记录、1 条简报保留。674 个 JSON 内容一致，1 个当天新闻归档已更新，3 个备份后本地新增对象尚未同步。私有 bucket 和业务 schema 权限符合预期；基础页面接口正常，匿名后台 / cron 返回 401。
 
-1. 实际目标环境、数据库 / 存储供应商、部署方式与已应用迁移版本，不含连接串和密钥。
-2. 所需环境变量名称、私有存储访问方式、schema 权限和 local / public 启动前置条件。
-3. SQLite、JSON 和研究归档是否迁移；源端备份、校验计数、切换窗口和回退步骤。未导入不能写数据已迁移。
-4. PostgreSQL 事务 / 隔离 / 幂等、私有对象访问、会话过期 / 跨实例、任务去重、备份恢复的实际验证。
-5. 本地兼容回归与真实部署验收分别记录，348 项旧测试不能覆盖新修改。
+**待发布缺陷修复**：线上股票目录 / AAPL 财报为 HTTP 500。S3 `ObjectPath` 缺少 SEC 哈希计算调用的 `read_bytes()`；本地已补齐，并通过新回归与完整 PostgreSQL 测试。本次没有部署或重跑导入，线上仍需发布并复验。详见 [迁移复核](validation-2026-11-10-migration-audit.md)。
 
-提交前检查 `git status --short`、`git diff --cached --name-only` 和分支 / 远程状态，只提交核对过的明确文件，不用 `git add .` 包入另一聊天的半成品。仓库 `origin` 为 `https://github.com/robber-857/tradingmarket.git`，本次整理开始时在 `main`；最终提交状态以 Git 日志为准。
+源备份在 `output/pre-supabase-20261110-180524/`。不重新导入非空云端库，不用旧本地数据覆盖云端新增内容。还需完成实际备份恢复演练、线上真实用户邮箱 / 权益流程、监控及负载验证。只读核对命令与报告见复核文档；它不会修复数据或触发模型 / 收款。
+
+提交前检查 Git 状态与暂存区，明确区分本地修复和远端已部署版本。仓库为 `https://github.com/robber-857/tradingmarket.git`，当前使用 `main`；上线后核对部署 SHA，而非只看 health。
 
 ## 7. 验证证据与命令
 
 迁移开始前的最近完整本地验收：后端 **348 passed**、前端 **14 passed**，生产构建通过，浏览器无错误；支付专项 37 项包含在后端集合内，不相加。会员在 390、768、1440px 及浅 / 深色检查，手机付款页无横向溢出；验证三币种报价、缺配置禁用结账和管理员隔离。详见 [验收记录](validation-2026-11-10-membership-billing-v2.md)。
 
-旧阶段 294 / 317 / 338 等结果保留在历史记录中，不替代最新结果。本次文档整理未重新验证正在变动的迁移代码；未验证真实 SMTP、实际渠道付款 / 退款、Apple Pay 设备、云端压力或新模型质量。
+迁移基线独立 PostgreSQL 回归 355 项通过；本次新增 S3 回归和 public 模式存储约束检查，最新结果见迁移复核。旧阶段 294 / 317 / 338 / 348 的结果保留，不累计相加。未验证真实 SMTP、实际渠道付款 / 退款、Apple Pay 设备、云端压力或新模型质量。
+
+本次最终结果：隔离 PostgreSQL **358 passed**；SQLite **351 passed / 7 skipped**，跳过的是需要 PostgreSQL 的检查，已在前一组执行。前端 **14 passed**、构建通过。下面默认命令运行 SQLite；完整云端路径需先在进程环境配置 `TEST_DATABASE_URL`，仅允许 loopback 主机且数据库名以 `_test` 结尾，绝不能设成生产连接串。
 
 ```powershell
 node --test tests/*.test.mjs
@@ -124,7 +124,7 @@ git diff --check
 
 ## 8. 接下来做什么
 
-1. 读取当前代码 / Git，与并行修改边界对齐，完成迁移专属验证与交接。
+1. 核对本地修复与线上版本，发布 S3 read_bytes 修复后实际验证股票搜索、财报和来源哈希；不得仅用健康接口替代业务验收。
 2. 重查测试配置；齐全后实际沙盒付款、回调 / 核对、续费失败 / 成功、取消、退款和重复通知，逐笔对账。
 3. 配置缺失时继续无外部账户依赖的 P0：缺渠道编号恢复、拒付、AI pending 恢复、token / 成本统计与费用保护。
 4. 完成商业授权、生产邮件、备份恢复、完整研究保存和正式课程；市场情绪未接供应商前关闭能力与扣费。
@@ -132,4 +132,4 @@ git diff --check
 
 可贴到新窗口：
 
-> 请先阅读 docs/README.md、docs/HANDOFF-2026-11-10-TOC-BILLING.md、docs/toc-launch-p0.md 和 docs/test-payments.md。检查并保留 D:\tradingknowledge 的所有未提交改动；另一聊天正在修改数据库和云端迁移，先确认当前状态，避免交叉覆盖。继续霁明 ToC P0，仅测试支付、不正式收款、不做 ToB。配置只报告缺项，不输出密钥；齐全后实际沙盒联调，缺失继续无账户依赖任务。前端 5173、后端 8001，启动前检查已有服务。
+> 请先阅读 docs/README.md、docs/HANDOFF-2026-11-10-TOC-BILLING.md、docs/toc-launch-p0.md 和 docs/test-payments.md。检查并保留 D:\tradingknowledge 的所有未提交改动；数据库迁移已完成，先读迁移复核记录并确认财报 S3 修复是否已部署；避免覆盖本地修复或重新导入非空云端库。继续霁明 ToC P0，仅测试支付、不正式收款、不做 ToB。配置只报告缺项，不输出密钥；齐全后实际沙盒联调，缺失继续无账户依赖任务。前端 5173、后端 8001，启动前检查已有服务。

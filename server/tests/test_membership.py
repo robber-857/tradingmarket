@@ -44,6 +44,7 @@ def test_saved_records_are_account_scoped():
         assert b.put('/api/account/saved/my-report',json={**data,'user_id':'someone'}).status_code==422
 
 
+@pytest.mark.usefixtures('public_database')
 def test_public_blocks_anonymous_ai_and_local_login_links(monkeypatch):
     monkeypatch.setenv('CLARORA_MODE','public')
     monkeypatch.setenv('CLARORA_PUBLIC_URL','https://clarora.example')

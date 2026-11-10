@@ -12,6 +12,16 @@ def test_sql_translation_keeps_literals_and_binds_values():
     assert postgres_sql("SELECT 'end?', end FROM grants WHERE id=?") == "SELECT 'end?', \"end\" FROM grants WHERE id=%s"
 
 
+def test_public_database_refuses_sqlite_without_cloud_url(monkeypatch, tmp_path):
+    from server.database import connect
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    monkeypatch.setenv('CLARORA_MODE', 'public')
+    with pytest.raises(RuntimeError, match='Public deployments require DATABASE_URL'):
+        with connect(tmp_path/'must-not-create.sqlite3'):
+            pytest.fail('Public deployment must not silently fall back to SQLite')
+    assert not (tmp_path/'must-not-create.sqlite3').exists()
+
+
 @pytest.fixture
 def postgres():
     if not os.getenv('TEST_DATABASE_URL'):

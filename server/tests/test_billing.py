@@ -136,6 +136,7 @@ def test_owner_and_admin_isolation(enabled):
         assert other.post('/api/billing/orders/'+o['id']+'/refresh').status_code==404
 
 
+@pytest.mark.usefixtures('public_database')
 def test_stripe_signature_timestamp_live_and_no_origin(enabled,monkeypatch):
     event={'id':'evt_test','type':'ignored','livemode':False,'data':{'object':{}}}
     raw,headers=signed(event)
