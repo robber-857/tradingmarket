@@ -1,3 +1,5 @@
+import uuid
+from .object_store import storage_path
 """SEC public-data adapter. No price feed, forecasts, or model-generated facts."""
 import asyncio
 import hashlib
@@ -13,7 +15,7 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / '.env')
-CACHE = ROOT / 'server' / 'cache'
+CACHE = storage_path('server/cache')
 CACHE.mkdir(exist_ok=True)
 COMPANIES = {
     'INTC': {'cik': '0000050863', 'name': '英特尔', 'english': 'Intel Corporation'},
@@ -83,7 +85,7 @@ async def company_directory():
                         response.raise_for_status()
                         payload = response.json()
                         parse_directory(payload)
-                        tmp = path.with_suffix('.tmp')
+                        tmp = path.with_suffix('.' + uuid.uuid4().hex + '.tmp')
                         tmp.write_text(json.dumps(payload),encoding='utf-8');tmp.replace(path)
                         cached = payload
                         await asyncio.sleep(.25)
@@ -164,7 +166,7 @@ async def fetch_company(symbol: str, refresh=False, company=None):
                         value = response.json()
                         if 'cik' not in value or int(value['cik']) != int(cik):
                             raise ValueError('Missing company identifier')
-                        tmp = path.with_suffix('.tmp')
+                        tmp = path.with_suffix('.' + uuid.uuid4().hex + '.tmp')
                         tmp.write_text(json.dumps(value), encoding='utf-8')
                         tmp.replace(path)
                         cached = value

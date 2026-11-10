@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ResearchWorkspace from "./ResearchWorkspace";
 import MacroCalendar from "./MacroCalendar";
@@ -9,6 +9,10 @@ import Watchlist from "./Watchlist";
 import BrandMark, { BrandLogo } from "./BrandMark";
 import OptionsWorkspace from "./OptionsWorkspace";
 import OptionStrategies from "./OptionStrategies";
+const Membership = lazy(() => import("./Membership"));
+const Admin = lazy(() => import("./Admin"));
+import {memberRequest} from "./member-api";
+import WatchlistSync from "./WatchlistSync";
 import {
   Activity,
   ArrowDownRight,
@@ -72,10 +76,11 @@ const navGroups = [
       ["watchlist", "我的关注", Star],
     ],
   },
-  { label: "学习与成长", items: [["academy", "交易学院", BookOpen]] },
+  { label: "学习与成长", items: [["academy", "交易学院", BookOpen], ["membership", "会员与账户", ShieldCheck]] },
 ];
 const navItems = navGroups.flatMap((g) => g.items);
 const titles = Object.fromEntries(navItems.map(([key, name]) => [key, name]));
+titles.admin = "管理员后台";
 const descriptions = {
   overview: "今日重点、关键日程与资产研究，从这里开始。",
   news: "筛选重要信息，理解事件背后的市场传导。",
@@ -89,6 +94,8 @@ const descriptions = {
   watchlist: "把你的研究对象，放在同一个视野里。",
   academy: "让每一次关注市场，都成为一次积累。",
   settings: "管理研究偏好与数据来源。",
+  membership: "管理会员权益、AI 额度与账户。",
+  admin: "管理用户账号、会员有效期与手动授权。",
 };
 function useStored(key, initial) {
   const [v, setV] = useState(() => {
@@ -338,6 +345,17 @@ export default function App() {
   const [reminders, setReminders] = useStored("meridian-reminders", []);
   const [savedNews, setSavedNews] = useStored("meridian-saved", []);
   const [courses, setCourses] = useStored("meridian-courses", initialCourses);
+  const [courseCatalog, setCourseCatalog] = useState([]);
+  const [courseError, setCourseError] = useState('');
+  const [courseBusy, setCourseBusy] = useState(false);
+  useEffect(() => {
+    if(page !== 'academy') return;
+    let alive = true;
+    memberRequest('/api/academy/courses').then(data => {
+      if(alive) {setCourseCatalog(data.courses);setCourseError('');}
+    }).catch(e => alive && setCourseError(e.message));
+    return () => {alive = false;};
+  }, [page]);
   const [completed, setCompleted] = useStored("meridian-completed", []);
   const [keywords, setKeywords] = useStored("meridian-keywords", [
     "Bitcoin",
@@ -776,10 +794,20 @@ export default function App() {
     );
   }
   function renderWatchlist() {
-    return <Watchlist watch={watch} assets={assets} onAdd={() => setSearchOpen(true)} onOpen={openAsset} onRemove={toggleWatch} timezone={settings.timezone} />;
+    return <><WatchlistSync watch={watch} onRestore={setWatch}/><Watchlist watch={watch} assets={assets} onAdd={() => setSearchOpen(true)} onOpen={openAsset} onRemove={toggleWatch} timezone={settings.timezone} /></>;
   }
   function renderAcademy() {
-    const list = courses.filter(
+    const catalog = courseCatalog.length ? courseCatalog : initialCourses;
+    const academyCourses = [...catalog.map(c => ({...c, serverCourse:true})), ...courses.filter(c => !initialCourses.some(i => i.id===c.id) && !catalog.some(i => i.id===c.id))];
+    async function openCourse(course) {
+      if(courseBusy) return;
+      if(!course.serverCourse) {setModal({type:'lesson',data:course});return;}
+      setCourseBusy(true);setCourseError('');
+      try {setModal({type:'lesson',data:await memberRequest('/api/academy/courses/'+encodeURIComponent(course.id))});}
+      catch(e) {setCourseError(e.message);}
+      finally {setCourseBusy(false);}
+    }
+    const list = academyCourses.filter(
       (c) =>
         courseFilter === "全部课程" ||
         (courseFilter === "已完成" && completed.includes(c.id)) ||
@@ -794,7 +822,8 @@ export default function App() {
             <p>从宏观到基本面，用系统的方法理解市场。</p>
             <button
               className="button"
-              onClick={() => setModal({ type: "lesson", data: courses[0] })}
+              disabled={courseBusy}
+              onClick={() => openCourse(academyCourses[0])}
             >
               从第一课开始
               <ArrowRight size={16} />
@@ -828,12 +857,15 @@ export default function App() {
             发布内容
           </button>
         </div>
+        {courseError && <p className="home-error" role="alert">{courseError} <a href="#membership">会员与账户</a></p>}
+        {courseBusy && <p role="status" className="fine-print">正在读取课程…</p>}
         <div className="course-grid">
           {list.map((c) => (
             <button
               className="course"
               key={c.id}
-              onClick={() => setModal({ type: "lesson", data: c })}
+              disabled={courseBusy}
+              onClick={() => openCourse(c)}
             >
               <div className={`course-art ${c.art}`}>
                 <span>{c.category}</span>
@@ -844,7 +876,7 @@ export default function App() {
                 ) : (
                   <Activity size={90} strokeWidth={0.7} />
                 )}
-                <span className="course-level">{c.level}</span>
+                <span className="course-level">{c.access==='premium'?'会员课程 · '+c.level:c.level}</span>
               </div>
               <div className="course-copy">
                 <span className="eyebrow">{c.category}</span>
@@ -954,6 +986,8 @@ export default function App() {
     sentiment: renderSentiment,
     watchlist: renderWatchlist,
     academy: renderAcademy,
+    admin: () => <Suspense fallback={<p role="status">正在打开管理后台…</p>}><Admin /></Suspense>,
+    membership: () => <Suspense fallback={<p role="status">正在打开会员中心…</p>}><Membership /></Suspense>,
     settings: renderSettings,
   };
   return (
@@ -1030,11 +1064,11 @@ export default function App() {
           </button>
           <button
             className="profile"
-            onClick={() => setModal({ type: "workspace" })}
+            onClick={() => navigate("membership")}
           >
             <span className="avatar profile-avatar">L</span>
             <span>
-              研究员<small>体验账户</small>
+              我的账户<small>会员与 AI 额度</small>
             </span>
             <ChevronsUpDown size={15} />
           </button>
@@ -1117,7 +1151,7 @@ export default function App() {
                 <span className="status-dot" />
                 {["overview", "financials", "fundamentals", "calendar", "news", "daily", "options", "strategies"].includes(page)
                   ? ({overview:"每日关注",calendar:"宏观数据",news:"真实新闻",daily:"AI 每日简报",options:"延迟期权链",strategies:"策略研究"}[page] || "财报研究")
-                  : ({settings:"个人偏好",watchlist:"自选研究",academy:"学习中心"}[page] || "示例内容")}
+                  : ({settings:"个人偏好",watchlist:"自选研究",academy:"学习中心",membership:"收费准备",admin:"账号管理"}[page] || "示例内容")}
               </Badge>
               {page === "sentiment" && (
                 <button className="button" onClick={exportBrief}>
@@ -1648,7 +1682,7 @@ export default function App() {
             <Badge tone="green">CLARORA PRO · 规划中</Badge>
             <h2>为持续研究，留一个专属空间。</h2>
             <p>
-              订阅制产品将由团队为客户开通账户，提供统一的市场研究与学习体验。
+              研究会员、高级会员与专家会员分别提供不同 AI 额度；高级及专家会员解锁全部会员课程。当前正在完成收费准备。
             </p>
             <div className="plan-features">
               {[
@@ -1673,10 +1707,10 @@ export default function App() {
               className="button primary"
               onClick={() => {
                 setModal(null);
-                navigate("academy");
+                navigate("membership");
               }}
             >
-              体验交易学院
+              查看会员与额度
               <ArrowRight size={15} />
             </button>
           </>
@@ -1702,7 +1736,7 @@ export default function App() {
               </div>
             </div>
             <p>
-              当前为免登录体验。研究记录仅保留在当前浏览器，暂不支持跨设备同步。
+              可在会员中心登录账户。关注清单支持手动保存与跨设备读取；财报与估值 AI 研究可保存到账户。其余浏览器偏好尚未同步。
             </p>
             <button
               className="button"

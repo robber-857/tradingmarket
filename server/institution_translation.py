@@ -1,3 +1,5 @@
+import uuid
+from .object_store import storage_path
 """Snapshot-bound, cached translation of public source excerpts; never market analysis."""
 import asyncio
 import calendar
@@ -10,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from . import macro, narrative
 
 VERSION = 'institution-translation-1'
-CACHE = macro.ROOT / 'server' / 'cache' / 'institution-translations'
+CACHE = storage_path('server/cache/institution-translations')
 LOCK = asyncio.Lock()
 
 
@@ -80,7 +82,7 @@ async def translate(request):
         result = await generate(original)
         result['sourceHash'] = identity
         CACHE.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix('.tmp')
+        temporary = path.with_suffix('.' + uuid.uuid4().hex + '.tmp')
         temporary.write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
         temporary.replace(path)
         return result

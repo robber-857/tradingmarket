@@ -1,3 +1,4 @@
+from .object_store import storage_path
 """Public delayed chains, explicit model assumptions, deterministic option research."""
 import asyncio
 from datetime import date, datetime, time, timedelta
@@ -10,8 +11,8 @@ from . import news
 from .sec import normalize_symbol
 
 ET = ZoneInfo('America/New_York')
-CACHE = news.ROOT / 'server/cache/options'
-SNAPSHOTS = news.ROOT / 'server/option_snapshots'
+CACHE = storage_path('server/cache/options')
+SNAPSHOTS = storage_path('server/option_snapshots')
 for folder in (CACHE, SNAPSHOTS): folder.mkdir(parents=True, exist_ok=True)
 FETCH_LOCK = asyncio.Lock()
 VERSION = 'options-math-1.0'

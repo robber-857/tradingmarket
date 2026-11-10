@@ -1,3 +1,4 @@
+from .session_store import SessionStore
 """Concise news explanations grounded in immutable, attributable feed excerpts."""
 from collections import deque
 import re
@@ -10,11 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from . import news, narrative
 
 VERSION = 'news-evidence-1.0.0'
-SESSIONS, ACTIVE, CALLS = {}, set(), deque()
+SESSIONS, ACTIVE, CALLS = SessionStore('news_ai'), set(), deque()
 NUMBER = re.compile(r'(?<![\w])[$€£]?[+-]?\d+(?:[,.]\d+)*(?:%|[KMB])?')
 
 
 class Request(BaseModel):
+    analysis_depth: Literal['standard', 'deep'] = 'standard'
     model_config = ConfigDict(extra='forbid')
     snapshot_id: str = Field(pattern=r'^[0-9a-f]{24}$')
     article_id: str | None = Field(default=None, pattern=r'^[0-9a-f]{24}$')

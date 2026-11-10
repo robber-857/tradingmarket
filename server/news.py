@@ -1,3 +1,5 @@
+import uuid
+from .object_store import storage_path
 """Bounded public RSS ingestion. Rankings retain their actual scope and provenance."""
 import asyncio
 from datetime import datetime, timedelta, timezone
@@ -21,9 +23,9 @@ import httpx
 
 from .sec import ROOT
 
-CACHE = ROOT / 'server/cache/news'
-SNAPSHOTS = ROOT / 'server/news_snapshots'
-EDITIONS = ROOT / 'server/news_editions'
+CACHE = storage_path('server/cache/news')
+SNAPSHOTS = storage_path('server/news_snapshots')
+EDITIONS = storage_path('server/news_editions')
 for folder in (CACHE, SNAPSHOTS, EDITIONS): folder.mkdir(parents=True, exist_ok=True)
 UTC = timezone.utc
 SYDNEY = ZoneInfo('Australia/Sydney')
@@ -174,7 +176,7 @@ def read_cache(path):
 
 
 def atomic_json(path, value):
-    temp = path.with_suffix('.tmp')
+    temp = path.with_suffix('.' + uuid.uuid4().hex + '.tmp')
     temp.write_text(json.dumps(value, ensure_ascii=False), encoding='utf-8')
     temp.replace(path)
 

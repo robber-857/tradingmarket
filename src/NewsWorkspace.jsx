@@ -1,5 +1,6 @@
 import {Pager,pageItems} from './DashboardMarkets';
 import {customerMessage} from './customer-message';
+import AnalysisDepth from './AnalysisDepth';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, RefreshCw, Sparkles, Send, Newspaper, MessageSquare, ExternalLink, Clock3 } from 'lucide-react';
 import './news-workspace.css';
@@ -16,6 +17,7 @@ function stamp(s, zone) { return s ? new Intl.DateTimeFormat('zh-CN', { timeZone
 function recent(item, hours) { const age = Date.now() - new Date(item.publishedAt).getTime(); return age >= -300000 && age <= hours * 3600000; }
 
 function NewsAnalysis({ snapshot, article, onPin }) {
+  const [analysisDepth,setAnalysisDepth] = useState('standard');
   const [turns, setTurns] = useState([]), [question, setQuestion] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const controller = useRef(null);
@@ -26,15 +28,16 @@ function NewsAnalysis({ snapshot, article, onPin }) {
     const ac = new AbortController(); controller.current = ac;
     try {
       const result = await fetch('/api/news/explain', { method: 'POST', signal: ac.signal, headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshot_id: snapshot.snapshotId, article_id: article?.id ?? null, question: q, conversation_id: turns.at(-1)?.conversationId ?? null }) }).then(jsonResponse);
+        body: JSON.stringify({ analysis_depth: analysisDepth, snapshot_id: snapshot.snapshotId, article_id: article?.id ?? null, question: q, conversation_id: turns.at(-1)?.conversationId ?? null }) }).then(jsonResponse);
       if (!ac.signal.aborted) { setTurns(t => [...t, result]); setQuestion(''); }
     } catch (e) { if (e.name !== 'AbortError') setError(e.message); }
     finally { if (!ac.signal.aborted) setBusy(false); }
   }
   return <section className="news-ai-block">
-    <div className="news-section-heading"><Sparkles size={17} /><h3>{article ? 'AI 简洁解读' : '今日市场重点'}</h3></div>
+    <div className="news-section-heading"><Sparkles size={17} /><h3>{article ? 'AI 新闻解读' : '今日市场重点'}</h3></div>
+    <AnalysisDepth value={analysisDepth} onChange={setAnalysisDepth} disabled={busy}/>
     {!turns.length && <><p>{article ? '简洁总结这则消息，区分来源陈述与市场推论。' : '从最近 24 小时的美股、Crypto 和宏观新闻中选取最多六则，提炼重点与可能影响。'}</p>
-      <button className="button primary" disabled={busy} onClick={() => ask()}><Sparkles size={14} />{busy ? '正在分析来源…' : article ? '生成新闻解读' : '生成今日重点'}</button>
+      <button className="button primary" disabled={busy} onClick={() => ask()}><Sparkles size={14} />{busy ? '正在分析来源…' : analysisDepth === 'deep' ? '生成深度分析' : article ? '生成新闻解读' : '生成今日重点'}</button>
       <small>解读依据新闻摘要或帖文预览，未包含全文。点击后生成 AI 解读。</small></>}
     <div aria-live="polite">{turns.map((turn, index) => <article className="news-answer" key={index}>
       {index > 0 && <p className="news-question">{turn.question}</p>}

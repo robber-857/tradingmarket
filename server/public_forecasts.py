@@ -1,3 +1,5 @@
+import uuid
+from .object_store import storage_path
 """Free public forecast facts. Deterministic parsing; no paid API or LLM calls."""
 import asyncio
 from datetime import datetime, timedelta
@@ -16,7 +18,7 @@ from pypdf import PdfReader
 from . import macro
 from . import institution_forecasts
 
-STORE = macro.ROOT / 'server/cache/public-forecasts.json'
+STORE = storage_path('server/cache/public-forecasts.json')
 LOCK = asyncio.Lock()
 SYDNEY = ZoneInfo('Australia/Sydney')
 SCOTIA = 'https://www.scotiabank.com/ca/en/about/economics/economics-publications.global-week-ahead.html'
@@ -137,7 +139,7 @@ def read():
 
 def write(data):
     STORE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STORE.with_suffix('.tmp')
+    tmp = STORE.with_suffix('.' + uuid.uuid4().hex + '.tmp')
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
     tmp.replace(STORE)
 

@@ -15,3 +15,6 @@ server/macro_snapshots/
 server/news_snapshots/
 server/news_editions/
 server/option_snapshots/
+
+!deploy/vercel.env.example
+.vercel/

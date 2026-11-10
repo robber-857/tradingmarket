@@ -1,16 +1,19 @@
+from .session_store import SessionStore
 import secrets
 import time
 import re
 import logging
+from typing import Literal
 from collections import deque
 from pydantic import BaseModel, ConfigDict, Field
 from . import options, narrative, news, news_ai
 
-SESSIONS, ACTIVE, CALLS = {}, set(), deque()
+SESSIONS, ACTIVE, CALLS = SessionStore('options_ai'), set(), deque()
 logger = logging.getLogger(__name__)
 
 
 class Request(BaseModel):
+    analysis_depth: Literal['standard', 'deep'] = 'standard'
     model_config = ConfigDict(extra='forbid')
     snapshot_id: str = Field(pattern=r'^[0-9a-f]{24}$')
     question: str = Field(default='',max_length=1200)

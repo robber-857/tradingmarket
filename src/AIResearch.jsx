@@ -1,4 +1,5 @@
 import {customerMessage} from './customer-message';
+import AnalysisDepth from './AnalysisDepth';
 import { useEffect, useRef, useState } from "react";
 import {
   Sparkles,
@@ -44,6 +45,9 @@ export default function AIResearch({
   const [config, setConfig] = useState(null);
   const [checking, setChecking] = useState(false);
   const [turns, setTurns] = useState([]);
+  const [analysisDepth, setAnalysisDepth] = useState('standard');
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
   const [question, setQuestion] = useState("");
   const [error, setError] = useState("");
   const [needsReset, setNeedsReset] = useState(false);
@@ -112,10 +116,11 @@ export default function AIResearch({
         `/api/research/${report.symbol}/explain`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
           signal: c.signal,
           body: JSON.stringify({
             snapshot_id: report.snapshotId,
+            analysis_depth: analysisDepth,
             report_end: quarter.end,
             mode,
             assumptions,
@@ -211,6 +216,17 @@ export default function AIResearch({
     a.click();
     URL.revokeObjectURL(url);
   };
+  const saveResearch = async () => {
+    setSaving(true);setSaveMessage('');
+    try {
+      await jsonRequest('/api/account/saved/'+crypto.randomUUID(), {
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({kind:'research',title:`${report.symbol} · ${quarter.end} · ${mode==='financials'?'财报':'估值'}研究`,
+          payload:{symbol:report.symbol,reportEnd:quarter.end,snapshotId:report.snapshotId,assumptions,analysisDepth,turns,savedAt:new Date().toISOString()}}),
+      });
+      setSaveMessage('已保存到账户，可在会员中心查看历史研究。');
+    } catch(e){setSaveMessage(e.message);}finally{setSaving(false);}
+  };
   const claim = (item, turn, lead = false) => (
     <div className={`ai-claim ${lead ? "ai-conclusion" : ""}`}>
       <span className={`ai-kind ${item.kind}`}>
@@ -256,10 +272,14 @@ export default function AIResearch({
             {mode === "financials" ? "财报证据" : assumptions ? "财报、行情与当前估值假设" : "财报与行情 · 当前无有效 DCF"}
           </p>
         </div>
-        <div className="ai-actions">
+        <div className="ai-controls">
+          <AnalysisDepth value={analysisDepth} disabled={busy} onChange={setAnalysisDepth}/>
+          <div className="ai-actions">
+          <button className="button" disabled={!turns.length||saving||busy} onClick={saveResearch}>{saving?'保存中…':'保存研究'}</button>
           <span className="badge">
             {config?.configured ? "AI 解读已就绪" : "AI 解读暂不可用"}
           </span>
+          {saveMessage&&<span role="status" className="fine-print">{saveMessage}</span>}
           <button
             className="icon-button"
             onClick={check}
@@ -287,6 +307,7 @@ export default function AIResearch({
               </button>
             </>
           )}
+          </div>
         </div>
       </div>
       {!config?.configured && (
@@ -310,7 +331,7 @@ export default function AIResearch({
             onClick={() => ask("")}
           >
             <Sparkles size={15} />
-            {busy ? "正在核对证据…" : "生成简洁解读"}
+            {busy ? "正在核对证据…" : analysisDepth === "deep" ? "生成深度分析" : "生成简洁解读"}
           </button>
         </div>
       )}

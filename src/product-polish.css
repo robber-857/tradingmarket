@@ -2,6 +2,14 @@
 .sidebar .brand { width:100%; padding:8px 5px; margin-bottom:12px; background:#f8f8fa; border-radius:8px; }
 .sidebar .brand > .brand-artwork { display:block; width:100%; height:auto; }
 .brand-story-artwork { display:block; width:100%; height:auto; margin:16px 0 24px; padding:12px; background:#f8f8fa; border-radius:10px; }
+/* The approved raster includes a pale background. In dark mode, turn it
+   black before screen blending so the surrounding surface shows through. */
+:root[data-theme="darkness"] .sidebar .brand { background:var(--sidebar); }
+:root[data-theme="darkness"] .brand-artwork {
+  background:transparent;
+  filter:grayscale(1) invert(1) contrast(1.2);
+  mix-blend-mode:screen;
+}
 .page-content { min-width: 0; }
 /* Keep help readable on short landscape viewports, too. */
 .field-help-popup { max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }

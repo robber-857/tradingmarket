@@ -1,4 +1,5 @@
 import {customerMessage} from './customer-message';
+import AnalysisDepth from './AnalysisDepth';
 import {dayKey, sevenDayEvents} from "./home-data";
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Clock3, RefreshCw, Sparkles, Send, CalendarDays } from 'lucide-react';
@@ -38,6 +39,7 @@ async function jsonResponse(response) {
 }
 
 function MacroExplanation({ event }) {
+  const [analysisDepth,setAnalysisDepth] = useState('standard');
   const [turns, setTurns] = useState([]);
   const [question, setQuestion] = useState('');
   const [error, setError] = useState('');
@@ -50,7 +52,7 @@ function MacroExplanation({ event }) {
     setBusy(true); setError('');
     try {
       const result = await fetch('/api/macro/explain', { method: 'POST', signal: ac.signal,
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ snapshot_id: event.snapshotId,
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analysis_depth: analysisDepth, snapshot_id: event.snapshotId,
           question: q, conversation_id: turns.at(-1)?.conversationId ?? null }) }).then(jsonResponse);
       if (!ac.signal.aborted) { setTurns(t => [...t, result]); setQuestion(''); }
     } catch (err) { if (err.name !== 'AbortError') setError(err.message); }
@@ -58,8 +60,9 @@ function MacroExplanation({ event }) {
   }
   return <section className="macro-ai">
     <div className="macro-section-title"><Sparkles size={18} /><h3>AI 跨资产解读</h3><span>{event.actual ? '数据解读' : event.status === 'upcoming' ? '发布前情景' : '数据待核验'}</span></div>
+    <AnalysisDepth value={analysisDepth} onChange={setAnalysisDepth} disabled={busy}/>
     {!turns.length && <><p>结合各家机构的预测区间与分歧，分析实际值高于、低于或落在区间内时，对美股和加密的可能影响。数据事实、分析推论与条件情景分别标注，引用本次研究所用数据。</p>
-      <button className="button primary" onClick={() => ask()} disabled={busy}><Sparkles size={15} />{busy ? '正在分析…' : '分析对美股与 Crypto 的影响'}</button></>}
+      <button className="button primary" onClick={() => ask()} disabled={busy}><Sparkles size={15} />{busy ? '正在分析…' : analysisDepth === 'deep' ? '生成深度分析' : '分析对美股与 Crypto 的影响'}</button></>}
     <div className="macro-conversation" aria-live="polite">
       {turns.map((turn, index) => <article className="macro-answer" key={index}>
         {index > 0 && <div className="macro-question">{turn.question}</div>}

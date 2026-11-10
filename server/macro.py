@@ -1,3 +1,4 @@
+from .object_store import storage_path
 """Public-source macro calendar; optional consensus feed. No synthetic economic values."""
 import asyncio
 from datetime import date, datetime, timedelta, timezone
@@ -21,8 +22,8 @@ from .sec import ROOT
 
 UTC = timezone.utc
 ET = ZoneInfo('America/New_York')
-CACHE = ROOT / 'server' / 'cache' / 'macro'
-SNAPSHOTS = ROOT / 'server' / 'macro_snapshots'
+CACHE = storage_path('server/cache/macro')
+SNAPSHOTS = storage_path('server/macro_snapshots')
 CACHE.mkdir(parents=True, exist_ok=True)
 SNAPSHOTS.mkdir(exist_ok=True)
 LOCK = asyncio.Lock()

@@ -1,3 +1,4 @@
+from .session_store import SessionStore
 """Evidence-bound OpenAI explanations. Math and source URLs stay on the server."""
 import asyncio
 from collections import deque
@@ -16,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .sec import ROOT
 from . import market
+from .membership import DEPTH
 from .valuation import Assumptions, WaccInputs, BetaInputs, calculate_beta, calculate_wacc, valuation_bundle
 
 PROMPT_VERSION = 'evidence-brief-1.3.0'
@@ -47,6 +49,7 @@ def status():
 
 
 class NarrativeRequest(BaseModel):
+    analysis_depth: Literal['standard', 'deep'] = 'standard'
     model_config = ConfigDict(extra='forbid')
     snapshot_id: str = Field(pattern=r'^[0-9a-f]{24}$')
     report_end: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
@@ -294,6 +297,7 @@ def validate_answer(raw, context):
 
 
 async def call_openai(context, history, question, *, instructions=None, validator=None, reasoning_effort='medium'):
+    deep = DEPTH.get() == 'deep'
     key,model = settings()
     if not key:
         raise AIError(503,'尚未配置 OPENAI_API_KEY，请在项目根目录 .env 填写后点击“检查配置”。')
@@ -305,8 +309,10 @@ async def call_openai(context, history, question, *, instructions=None, validato
     schema['$defs']['Claim']['properties']['citations']['items']={'type':'string','enum':list(context['registry'])}
     payload = {'model':model,'store':False,'instructions':instructions or INSTRUCTIONS,
         'input':[{'role':'user','content':json.dumps({'evidence':compact,'history':history,'question':question},ensure_ascii=False)}],
-        'reasoning':{'effort':reasoning_effort}, 'max_output_tokens':6000,
+        'reasoning':{'effort':'high' if deep else reasoning_effort}, 'max_output_tokens':10000 if deep else 6000,
         'text':{'format':{'type':'json_schema','name':'research_brief','strict':True,'schema':schema}}}
+    if deep:
+        payload['instructions'] += '\n深度分析模式：在既定结构和证据范围内，优先检查相反解释、关键假设敏感性、证据缺口及能够证伪结论的观察条件。不得编造新数据或假称开展外部检索。保持原有引用校验与篇幅要求。'
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(90,connect=10)) as client:
             response = await client.post('https://api.openai.com/v1/responses',
@@ -339,7 +345,7 @@ async def call_openai(context, history, question, *, instructions=None, validato
 
 
 # Local single-user service. No API key ever enters the session or browser payload.
-SESSIONS = {}
+SESSIONS = SessionStore('narrative')
 _calls = deque()
 _active = set()
 

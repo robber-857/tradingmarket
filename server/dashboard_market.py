@@ -1,3 +1,4 @@
+from .object_store import storage_path
 """Bounded public market overview. Quotes are indicative, never synthetic."""
 import asyncio
 from copy import deepcopy
@@ -21,7 +22,7 @@ CATALOG = [
     ('dollar', 'DX-Y.NYB', '美元指数', '美元指数现货', '点'),
     ('vix', '^VIX', 'VIX', '标普隐含波动率指数', '点'),
 ]
-CACHE = news.ROOT / 'server/cache/dashboard_market'
+CACHE = storage_path('server/cache/dashboard_market')
 _cache = {}
 _lock = asyncio.Lock()
 _watch_cache = {}

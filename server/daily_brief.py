@@ -24,12 +24,9 @@ def settings():
 
 @contextmanager
 def connect():
-    c = sqlite3.connect(DB, timeout=5)
-    c.row_factory = sqlite3.Row
-    c.execute('CREATE TABLE IF NOT EXISTS editions (day TEXT PRIMARY KEY, status TEXT, attempts INTEGER, updated TEXT, payload TEXT, error TEXT)')
-    try:
-        with c: yield c
-    finally: c.close()
+    from .database import connect as connection
+    with connection(DB, 'editions') as c:
+        yield c
 
 
 def listing(day=None):
@@ -61,7 +58,7 @@ async def generate(manual=False):
             if row and not manual and (row['attempts'] >= 3 or (news.now()-news.date_time(row['updated'])).total_seconds() < 3600):
                 return None
             attempts = (row['attempts'] if row else 0) + 1
-            c.execute('INSERT OR REPLACE INTO editions VALUES (?,?,?,?,?,?)', (day, 'generating', attempts, news.iso(news.now()), None, None))
+            c.execute('INSERT INTO editions VALUES (?,?,?,?,?,?) ON CONFLICT(day) DO UPDATE SET status=excluded.status, attempts=excluded.attempts, updated=excluded.updated, payload=excluded.payload, error=excluded.error', (day, 'generating', attempts, news.iso(news.now()), None, None))
         try:
             snapshot = await news.feed()
             context, selected = news_ai.build_context(snapshot, None)

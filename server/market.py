@@ -1,3 +1,4 @@
+from .object_store import storage_path
 """Server-only Twelve Data adapter and immutable, evidence-bound market snapshots."""
 import asyncio
 from collections import OrderedDict
@@ -20,7 +21,7 @@ PROVIDER = 'Twelve Data'
 SOURCE = 'https://twelvedata.com/docs/market-data/time-series'
 QUOTE_SOURCE = 'https://twelvedata.com/docs/market-data/quote'
 VERSION = 'market-ols-1.0.0'
-SNAPSHOTS = ROOT / 'server' / 'market_snapshots'
+SNAPSHOTS = storage_path('server/market_snapshots')
 _cache = OrderedDict()
 _lock = asyncio.Lock()
 _last_call = 0.0

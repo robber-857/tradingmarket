@@ -2,6 +2,7 @@
 export function customerMessage(value, fallback = '服务暂时不可用，请稍后重试。') {
   const text = typeof value === 'string' ? value.trim() : '';
   if (!text) return fallback;
+  if (/本周期.*额度已用完|请先登录|不属于当前账户|同一请求编号|等待恢复/.test(text)) return text;
   if (/快照.*(过期|不存在)|snapshot.*(expired|not found)/i.test(text))
     return '研究数据已更新或过期，请刷新后重新分析。';
   if (/429|rate.limit|额度|限流/i.test(text))

@@ -1,3 +1,4 @@
+from .object_store import storage_path
 from . import institution_translation
 import json
 import asyncio
@@ -14,6 +15,13 @@ from .sec import COMPANIES, ROOT, DataUnavailable, SymbolError, fetch_company, r
 from .valuation import Assumptions, WaccInputs, BetaInputs, calculate_beta, calculate_wacc, valuation_bundle
 from . import narrative, market, macro, macro_ai, news, news_ai, daily_brief, options, options_ai, option_strategies, live_strategies, public_forecasts
 from . import dashboard_market
+from . import member_api
+from . import scheduled
+from . import academy
+from . import admin_api
+from . import billing_catalog
+from . import billing
+from . import payment_operations
 
 
 @asynccontextmanager
@@ -31,9 +39,17 @@ async def lifespan(app):
 
 
 app=FastAPI(title='Clarora research engine', version='0.3.0', lifespan=lifespan)
+app.include_router(member_api.router)
+app.include_router(scheduled.router)
+app.include_router(academy.router)
+app.include_router(admin_api.router)
+app.include_router(billing_catalog.router)
+app.include_router(billing.router)
+app.include_router(payment_operations.router)
+app.middleware('http')(member_api.access_middleware)
 app.add_middleware(CORSMiddleware, allow_origins=['http://127.0.0.1:5173','http://localhost:5173','http://127.0.0.1:4173'],
-                   allow_methods=['GET','POST'],allow_headers=['Content-Type'])
-REPORTS=ROOT/'server'/'reports'
+                   allow_methods=['GET','POST','PUT','DELETE'],allow_headers=['Content-Type','Idempotency-Key'])
+REPORTS= storage_path('server/reports')
 REPORTS.mkdir(exist_ok=True)
 
 

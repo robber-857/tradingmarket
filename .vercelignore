@@ -1,0 +1,15 @@
+.env*
+.venv
+.git
+output
+.playwright-cli
+.pytest_cache
+server/cache
+server/reports
+server/market_snapshots
+server/macro_snapshots
+server/news_snapshots
+server/news_editions
+server/option_snapshots
+server/tests
+**/__pycache__

@@ -1,21 +1,24 @@
+from .session_store import SessionStore
 """Event-snapshot-bound explanations using the shared OpenAI transport."""
 from collections import deque
 from datetime import datetime
 import re
 import secrets
 import time
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import macro, narrative, public_forecasts
 
 VERSION = 'macro-evidence-1.1.0'
-SESSIONS = {}
+SESSIONS = SessionStore('macro_ai')
 ACTIVE = set()
 CALLS = deque()
 
 
 class Request(BaseModel):
+    analysis_depth: Literal['standard', 'deep'] = 'standard'
     model_config = ConfigDict(extra='forbid')
     snapshot_id: str = Field(pattern=r'^[0-9a-f]{24}$')
     question: str = Field(default='', max_length=1200)
