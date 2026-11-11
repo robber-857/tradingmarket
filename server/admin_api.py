@@ -17,7 +17,7 @@ class Provision(BaseModel):
     email: str = Field(min_length=3, max_length=254)
     plan: Literal['free', 'research', 'advanced', 'expert']
     days: int = Field(default=30, ge=1, le=366, strict=True)
-    reason: str = Field(min_length=3, max_length=500)
+    reason: str = Field(min_length=2, max_length=500)
     request_key: str = Field(pattern=r'^[A-Za-z0-9_-]{16,100}$')
 
 
@@ -26,10 +26,10 @@ class Revoke(BaseModel):
     reason: str = Field(min_length=3, max_length=500)
 
 
-def note(value):
+def note(value, minimum=3):
     value = value.strip()
-    if len(value) < 3:
-        raise HTTPException(422, '请填写至少三个字的操作原因。')
+    if len(value) < minimum:
+        raise HTTPException(422, f'请填写至少{minimum}个字的操作原因。')
     return value
 
 
@@ -47,10 +47,10 @@ def users(request: Request, response: Response, q: str = Query('', max_length=25
     with m.database() as db:
         args = (q.strip().lower(),)
         total = db.execute('SELECT count(*) FROM users WHERE instr(email,?)>0', args).fetchone()[0]
-        rows = db.execute('SELECT * FROM users WHERE instr(email,?)>0 ORDER BY created DESC,id LIMIT 25 OFFSET ?',
+        rows = db.execute('SELECT * FROM users WHERE instr(email,?)>0 ORDER BY created DESC,id LIMIT 10 OFFSET ?',
                           (*args, offset)).fetchall()
         items = [{**dict(row), **m.entitlement(db, row['id'])} for row in rows]
-    return {'items': items, 'total': total, 'offset': offset, 'pageSize': 25}
+    return {'items': items, 'total': total, 'offset': offset, 'pageSize': 10}
 
 
 @router.get('/users/{user_id}')
@@ -78,7 +78,7 @@ def provision(body: Provision, request: Request, response: Response):
     email = body.email.strip().lower()
     if not re.fullmatch(r'[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+', email):
         raise HTTPException(422, '请输入有效邮箱地址。')
-    reason = note(body.reason)
+    reason = note(body.reason, minimum=2)
     fingerprint = m.digest(json.dumps([email, body.plan, body.days, reason]))
     now = time.time()
     with m.database() as db:

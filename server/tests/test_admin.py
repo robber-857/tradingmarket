@@ -137,3 +137,27 @@ def test_admin_role_revocation_applies_to_existing_session(admin, monkeypatch):
     monkeypatch.setenv('CLARORA_ADMIN_EMAILS', '')
     assert admin.get('/api/admin/users').status_code == 403
     assert not admin.get('/api/account').json()['isAdmin']
+
+
+def test_two_character_reason_grants_membership_and_is_audited(admin):
+    result = admin.post('/api/admin/users', json=body(reason='内测', plan='expert'))
+    assert result.status_code == 200
+    detail = admin.get('/api/admin/users/'+result.json()['userId']).json()
+    assert detail['account']['plan'] == 'expert'
+    assert detail['grants'][0]['reason'] == '内测'
+    assert detail['account']['usage']['ai']['limit'] == m.PLANS['expert']['limits']['ai']
+    assert admin.post('/api/admin/users', json=body(email='other@example.com', reason=' 测 ', request_key='another-request-key')).status_code == 422
+
+
+def test_user_list_ten_per_page_search_and_last_page(admin):
+    with m.database() as db:
+        for i in range(23):
+            db.execute('INSERT INTO users VALUES (?,?,?)', (f'page-user-{i:02d}',f'page{i:02d}@example.com',1700000000+i))
+    pages = [admin.get(f'/api/admin/users?q=page&offset={offset}').json() for offset in (0,10,20)]
+    assert [len(page['items']) for page in pages] == [10,10,3]
+    assert all(page['total']==23 and page['pageSize']==10 for page in pages)
+    ids = [user['id'] for page in pages for user in page['items']]
+    assert len(set(ids)) == 23
+    assert ids == [f'page-user-{i:02d}' for i in reversed(range(23))]
+    assert admin.get('/api/admin/users?q=missing&offset=0').json()['total'] == 0
+    assert admin.get('/api/admin/users?offset=-1').status_code == 422
